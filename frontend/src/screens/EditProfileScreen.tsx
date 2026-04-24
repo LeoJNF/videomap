@@ -1,304 +1,253 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import React, { useMemo, useState } from 'react';
+import {
+  Image,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import { useAuth } from '../contexts/AuthContext';
-import api from '../services/api';
+import { AppScreen } from '../components/common/AppScreen';
+import { FilterChip } from '../components/common/FilterChip';
+import { ScreenHeader } from '../components/common/ScreenHeader';
+import { useMarketplace } from '../contexts/MarketplaceContext';
+import { colors, shadows } from '../theme/tokens';
+import { experienceLevels } from '../types/marketplace';
+import { pickImageFromDevice } from '../utils/deviceMedia';
+import { parseList } from '../utils/format';
 
 export default function EditProfileScreen({ navigation }: any) {
-  const { user, updateUser } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [loadingData, setLoadingData] = useState(true);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    bio: '',
-    city: '',
-    whatsapp: '',
-    avatarUrl: '',
-  });
+  const { currentProvider, updateCurrentProvider } = useMarketplace();
 
-  useEffect(() => {
-    loadUserData();
-  }, []);
+  const [form, setForm] = useState(() => ({
+    name: currentProvider?.name || '',
+    headline: currentProvider?.headline || '',
+    bio: currentProvider?.bio || '',
+    location: currentProvider?.location || '',
+    experienceLevel: currentProvider?.experienceLevel || 'Iniciante',
+    specialties: currentProvider?.specialties.join(', ') || '',
+    avatarUrl: currentProvider?.avatarUrl || '',
+    whatsapp: currentProvider?.contact.whatsapp || '',
+    instagram: currentProvider?.contact.instagram || '',
+    website: currentProvider?.contact.website || '',
+    email: currentProvider?.contact.email || '',
+    startingPrice: String(currentProvider?.startingPrice || ''),
+    responseTime: currentProvider?.responseTime || '',
+    availabilityLabel: currentProvider?.availabilityLabel || '',
+    featuredQuote: currentProvider?.featuredQuote || '',
+  }));
+  const [saving, setSaving] = useState(false);
+  const [pickerError, setPickerError] = useState('');
 
-  async function loadUserData() {
-    try {
-      const response = await api.get(`/users/${user?.id}`);
-      setFormData({
-        name: response.data.name || '',
-        bio: response.data.bio || '',
-        city: response.data.city || '',
-        whatsapp: response.data.whatsapp || '',
-        avatarUrl: response.data.avatarUrl || '',
-      });
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-    } finally {
-      setLoadingData(false);
-    }
+  const canSave = useMemo(
+    () => form.name.trim() && form.headline.trim() && form.location.trim(),
+    [form.headline, form.location, form.name],
+  );
+
+  if (!currentProvider) {
+    return null;
   }
 
-  async function pickImage() {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    if (!permissionResult.granted) {
-      Alert.alert('Permissão necessária', 'Precisamos de acesso à sua galeria de fotos');
-      return;
-    }
+  const startingPriceFallback = currentProvider.startingPrice;
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      await uploadAvatar(result.assets[0].uri);
-    }
-  }
-
-  async function uploadAvatar(uri: string) {
-    setUploadingImage(true);
+  async function handlePickAvatar() {
+    setPickerError('');
     try {
-      const uploadFormData = new FormData();
-      const filename = uri.split('/').pop();
-      const match = /\.(\w+)$/.exec(filename || '');
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
-
-      uploadFormData.append('avatar', {
-        uri,
-        name: filename,
-        type,
-      } as any);
-
-      const response = await api.post(`/users/${user?.id}/avatar`, uploadFormData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      setFormData({ ...formData, avatarUrl: response.data.avatarUrl });
-      await updateUser(response.data);
-      Alert.alert('Sucesso!', 'Foto atualizada com sucesso!');
+      const asset = await pickImageFromDevice();
+      if (!asset) return;
+      setForm((current) => ({ ...current, avatarUrl: asset.uri }));
     } catch (error: any) {
-      console.error('Erro ao fazer upload:', error);
-      Alert.alert('Erro', 'Não foi possível fazer upload da imagem');
-    } finally {
-      setUploadingImage(false);
+      setPickerError(error.message || 'Nao foi possivel selecionar a foto do perfil.');
     }
   }
 
   async function handleSave() {
-    if (!formData.name.trim()) {
-      return Alert.alert('Atenção', 'O nome é obrigatório!');
-    }
-
-    setLoading(true);
-    try {
-      const response = await api.put(`/users/${user?.id}`, formData);
-      
-      // Atualizar dados do usuário no contexto
-      await updateUser(response.data);
-      
-      Alert.alert('Sucesso!', 'Perfil atualizado com sucesso!', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
-    } catch (error: any) {
-      const message = error.response?.data?.message || 'Erro ao atualizar perfil';
-      Alert.alert('Erro', message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  if (loadingData) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#F97316" />
-      </View>
-    );
+    if (!canSave) return;
+    setSaving(true);
+    await updateCurrentProvider({
+      name: form.name.trim(),
+      headline: form.headline.trim(),
+      bio: form.bio.trim(),
+      location: form.location.trim(),
+      experienceLevel: form.experienceLevel,
+      specialties: parseList(form.specialties),
+      avatarUrl: form.avatarUrl.trim(),
+      startingPrice: Number(form.startingPrice || startingPriceFallback),
+      responseTime: form.responseTime.trim(),
+      availabilityLabel: form.availabilityLabel.trim(),
+      featuredQuote: form.featuredQuote.trim(),
+      contact: {
+        whatsapp: form.whatsapp.trim(),
+        instagram: form.instagram.trim(),
+        website: form.website.trim(),
+        email: form.email.trim(),
+      },
+    });
+    setSaving(false);
+    navigation.goBack();
   }
 
   return (
-    <KeyboardAvoidingView 
-      style={{ flex: 1 }} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={styles.container}>
-        <StatusBar style="light" />
-        
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="close" size={28} color="#FFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Editar Perfil</Text>
-          <TouchableOpacity onPress={handleSave} disabled={loading}>
-            {loading ? (
-              <ActivityIndicator color="#F97316" />
-            ) : (
-              <Ionicons name="checkmark" size={28} color="#F97316" />
-            )}
+    <AppScreen scroll>
+      <ScreenHeader
+        title="Editar perfil"
+        subtitle="Foto, nivel e dados publicos do videomaker."
+        onBack={() => navigation.goBack()}
+      />
+      <View style={styles.card}>
+        <Text style={styles.label}>Foto do perfil</Text>
+        <View style={styles.mediaRow}>
+          <Image source={{ uri: form.avatarUrl }} style={styles.avatarPreview} />
+          <TouchableOpacity style={styles.mediaButton} onPress={handlePickAvatar}>
+            <Ionicons name="image-outline" size={18} color={colors.accentStrong} />
+            <Text style={styles.mediaButtonTitle}>Trocar foto</Text>
+            <Text style={styles.mediaButtonText}>Selecionar imagem do dispositivo</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
-          <View style={styles.form}>
-          {/* Foto de Perfil */}
-          <View style={styles.avatarSection}>
-            <TouchableOpacity onPress={pickImage} disabled={uploadingImage}>
-              {formData.avatarUrl ? (
-                <Image source={{ uri: formData.avatarUrl }} style={styles.avatarPreview} />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <Ionicons name="person" size={50} color="#64748B" />
-                </View>
-              )}
-              {uploadingImage && (
-                <View style={styles.uploadingOverlay}>
-                  <ActivityIndicator color="#F97316" />
-                </View>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={pickImage} disabled={uploadingImage} style={styles.changePhotoButton}>
-              <Ionicons name="camera" size={16} color="#F97316" />
-              <Text style={styles.changePhotoText}>Alterar Foto</Text>
-            </TouchableOpacity>
+        {pickerError ? <Text style={styles.errorText}>{pickerError}</Text> : null}
+
+        <Text style={styles.label}>Nivel exibido na busca</Text>
+        <View style={styles.levelRow}>
+          {experienceLevels.map((item) => (
+            <FilterChip
+              key={item}
+              label={item}
+              active={form.experienceLevel === item}
+              onPress={() => setForm((current) => ({ ...current, experienceLevel: item }))}
+            />
+          ))}
+        </View>
+
+        {[
+          ['Nome', 'name'],
+          ['Headline', 'headline'],
+          ['Cidade base', 'location'],
+          ['WhatsApp', 'whatsapp'],
+          ['Instagram', 'instagram'],
+          ['Website', 'website'],
+          ['Email publico', 'email'],
+          ['Preco inicial', 'startingPrice'],
+          ['Tempo de resposta', 'responseTime'],
+          ['Disponibilidade', 'availabilityLabel'],
+          ['Frase destaque', 'featuredQuote'],
+          ['Especialidades (separe por virgula)', 'specialties'],
+        ].map(([label, key]) => (
+          <View key={key}>
+            <Text style={styles.label}>{label}</Text>
+            <TextInput
+              style={styles.input}
+              value={(form as any)[key]}
+              onChangeText={(value) => setForm((current) => ({ ...current, [key]: value }))}
+              placeholderTextColor={colors.textSoft}
+            />
           </View>
+        ))}
 
-          <Text style={styles.label}>NOME COMPLETO *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Seu nome"
-            placeholderTextColor="#64748B"
-            value={formData.name}
-            onChangeText={(text) => setFormData({ ...formData, name: text })}
-          />
-
-          <Text style={styles.label}>BIO</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Conte um pouco sobre você e seu trabalho..."
-            placeholderTextColor="#64748B"
-            value={formData.bio}
-            onChangeText={(text) => setFormData({ ...formData, bio: text })}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
-
-          <Text style={styles.label}>CIDADE/REGIÃO</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: São Paulo, SP"
-            placeholderTextColor="#64748B"
-            value={formData.city}
-            onChangeText={(text) => setFormData({ ...formData, city: text })}
-          />
-
-          <Text style={styles.label}>WHATSAPP</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="11999999999"
-            placeholderTextColor="#64748B"
-            keyboardType="phone-pad"
-            value={formData.whatsapp}
-            onChangeText={(text) => setFormData({ ...formData, whatsapp: text })}
-          />
-        </View>
-      </ScrollView>
-    </View>
-    </KeyboardAvoidingView>
+        <Text style={styles.label}>Bio</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          value={form.bio}
+          onChangeText={(bio) => setForm((current) => ({ ...current, bio }))}
+          multiline
+          numberOfLines={6}
+          textAlignVertical="top"
+          placeholderTextColor={colors.textSoft}
+        />
+      </View>
+      <TouchableOpacity
+        style={[styles.button, !canSave && styles.buttonDisabled]}
+        onPress={handleSave}
+        disabled={!canSave || saving}
+      >
+        <Text style={styles.buttonText}>{saving ? 'Salvando...' : 'Salvar alteracoes'}</Text>
+      </TouchableOpacity>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0F172A',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#334155',
-  },
-  headerTitle: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  form: {
-    padding: 20,
-  },
-  avatarSection: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  avatarPreview: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 3,
-    borderColor: '#F97316',
-  },
-  avatarPlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#1E293B',
-    borderWidth: 3,
-    borderColor: '#334155',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  uploadingOverlay: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  changePhotoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  changePhotoText: {
-    color: '#F97316',
-    fontSize: 14,
-    fontWeight: '600',
+  card: {
+    borderRadius: 28,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 18,
+    ...shadows.card,
   },
   label: {
-    color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: 'bold',
+    color: colors.text,
+    fontWeight: '800',
     marginBottom: 8,
-    marginTop: 16,
+    marginTop: 14,
+    fontSize: 13,
+  },
+  mediaRow: {
+    flexDirection: 'row',
+    gap: 14,
+    alignItems: 'center',
+  },
+  avatarPreview: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    borderWidth: 2,
+    borderColor: colors.accent,
+    backgroundColor: colors.surfaceStrong,
+  },
+  mediaButton: {
+    flex: 1,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    padding: 16,
+    gap: 6,
+  },
+  mediaButtonTitle: {
+    color: colors.text,
+    fontWeight: '800',
+  },
+  mediaButtonText: {
+    color: colors.textMuted,
+    lineHeight: 18,
+  },
+  levelRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  errorText: {
+    marginTop: 10,
+    color: colors.danger,
+    fontWeight: '700',
   },
   input: {
-    backgroundColor: '#1E293B',
-    color: '#FFF',
-    padding: 15,
-    borderRadius: 8,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#334155',
-    fontSize: 16,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    color: colors.text,
   },
   textArea: {
-    height: 100,
-    paddingTop: 15,
+    minHeight: 130,
+  },
+  button: {
+    marginTop: 20,
+    marginBottom: 28,
+    borderRadius: 18,
+    backgroundColor: colors.accentStrong,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.4,
+  },
+  buttonText: {
+    color: colors.white,
+    fontWeight: '800',
   },
 });

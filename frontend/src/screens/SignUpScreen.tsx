@@ -1,159 +1,221 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import api from '../services/api';
+﻿import React, { useState } from 'react';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { AppScreen } from '../components/common/AppScreen';
+import { FilterChip } from '../components/common/FilterChip';
+import { ScreenHeader } from '../components/common/ScreenHeader';
+import { useMarketplace } from '../contexts/MarketplaceContext';
+import { colors, shadows } from '../theme/tokens';
+import { experienceLevels, ExperienceLevel } from '../types/marketplace';
+import { parseList } from '../utils/format';
+
+const defaultSpecialties = ['Casamentos', 'Brand Content', 'Eventos Corporativos', 'Fashion Films', 'Documentarios'];
 
 export default function SignUpScreen({ navigation }: any) {
-  const [loading, setLoading] = useState(false);
-  const [userType, setUserType] = useState<'PROVIDER' | 'CLIENT'>('PROVIDER');
-  const [formData, setFormData] = useState({
+  const { registerProvider } = useMarketplace();
+  const [form, setForm] = useState({
     name: '',
     email: '',
     password: '',
-    cpf: '',
-    whatsapp: '',
+    location: '',
+    experienceLevel: 'Iniciante' as ExperienceLevel,
+    specialties: [] as string[],
+    customSpecialties: '',
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  async function handleSignUp() {
-    const { name, email, password } = formData;
+  function toggleSpecialty(label: string) {
+    setForm((current) => ({
+      ...current,
+      specialties: current.specialties.includes(label)
+        ? current.specialties.filter((item) => item !== label)
+        : [...current.specialties, label],
+    }));
+  }
 
-    if (!name || !email || !password) {
-      return Alert.alert('Atenção', 'Preencha os campos obrigatórios!');
-    }
-
+  async function handleRegister() {
     setLoading(true);
-    try {
-      await api.post('/users', {
-        ...formData,
-        role: userType
-      });
+    setError('');
 
-      Alert.alert('Sucesso!', 'Conta criada. Faça login agora.', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
-      
-    } catch (error: any) {
-      const message = error.response?.data?.message || 'Não foi possível cadastrar.';
-      Alert.alert('Erro', Array.isArray(message) ? message[0] : message);
+    try {
+      const specialties = Array.from(
+        new Set([...form.specialties, ...parseList(form.customSpecialties)]),
+      );
+
+      await registerProvider({
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        location: form.location,
+        specialties,
+        experienceLevel: form.experienceLevel,
+      });
+      navigation.replace('Main');
+    } catch (err: any) {
+      setError(err.message || 'Nao foi possivel criar o perfil.');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
-      <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
-        <Text style={styles.title}>Crie sua conta</Text>
-        <Text style={styles.subtitle}>Escolha o tipo de conta e comece agora</Text>
+    <AppScreen scroll>
+      <ScreenHeader title="Criar perfil" subtitle="Cadastro do videomaker, nao do cliente." onBack={() => navigation.goBack()} />
+      <View style={styles.card}>
+        <Text style={styles.eyebrow}>Novo studio</Text>
+        <Text style={styles.title}>Monte um perfil profissional pronto para ser encontrado por clientes.</Text>
 
-        {/* Seletor de Tipo de Usuário */}
-        <View style={styles.userTypeContainer}>
-          <TouchableOpacity 
-            style={[styles.userTypeButton, userType === 'PROVIDER' && styles.userTypeButtonActive]}
-            onPress={() => setUserType('PROVIDER')}
-          >
-            <Text style={[styles.userTypeEmoji, userType === 'PROVIDER' && styles.userTypeEmojiActive]}>🎥</Text>
-            <Text style={[styles.userTypeText, userType === 'PROVIDER' && styles.userTypeTextActive]}>
-              Videomaker
-            </Text>
-            <Text style={styles.userTypeSubtext}>Quero vender serviços</Text>
-          </TouchableOpacity>
+        <Text style={styles.label}>Nome do studio ou videomaker</Text>
+        <TextInput
+          style={styles.input}
+          value={form.name}
+          onChangeText={(name) => setForm((current) => ({ ...current, name }))}
+          placeholder="Ex: Marina Rocha Films"
+          placeholderTextColor={colors.textSoft}
+        />
 
-          <TouchableOpacity 
-            style={[styles.userTypeButton, userType === 'CLIENT' && styles.userTypeButtonActive]}
-            onPress={() => setUserType('CLIENT')}
-          >
-            <Text style={[styles.userTypeEmoji, userType === 'CLIENT' && styles.userTypeEmojiActive]}>👤</Text>
-            <Text style={[styles.userTypeText, userType === 'CLIENT' && styles.userTypeTextActive]}>
-              Cliente
-            </Text>
-            <Text style={styles.userTypeSubtext}>Quero contratar</Text>
-          </TouchableOpacity>
+        <Text style={styles.label}>Email de acesso</Text>
+        <TextInput
+          style={styles.input}
+          value={form.email}
+          onChangeText={(email) => setForm((current) => ({ ...current, email }))}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          placeholder="voce@studio.com"
+          placeholderTextColor={colors.textSoft}
+        />
+
+        <Text style={styles.label}>Senha</Text>
+        <TextInput
+          style={styles.input}
+          value={form.password}
+          onChangeText={(password) => setForm((current) => ({ ...current, password }))}
+          secureTextEntry
+          placeholder="Crie uma senha"
+          placeholderTextColor={colors.textSoft}
+        />
+
+        <Text style={styles.label}>Cidade base</Text>
+        <TextInput
+          style={styles.input}
+          value={form.location}
+          onChangeText={(location) => setForm((current) => ({ ...current, location }))}
+          placeholder="Ex: Sao Paulo, SP"
+          placeholderTextColor={colors.textSoft}
+        />
+
+        <Text style={styles.label}>Nivel exibido na busca</Text>
+        <View style={styles.chipWrap}>
+          {experienceLevels.map((item) => (
+            <FilterChip
+              key={item}
+              label={item}
+              active={form.experienceLevel === item}
+              onPress={() =>
+                setForm((current) => ({ ...current, experienceLevel: item }))
+              }
+            />
+          ))}
         </View>
 
-        <Text style={styles.label}>NOME COMPLETO</Text>
-        <TextInput style={styles.input} placeholderTextColor="#64748B" placeholder="Ex: João Silva" 
-            value={formData.name} onChangeText={t => setFormData({...formData, name: t})} />
+        <Text style={styles.label}>Especialidades</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+          <View style={styles.chipRow}>
+            {defaultSpecialties.map((item) => (
+              <FilterChip
+                key={item}
+                label={item}
+                active={form.specialties.includes(item)}
+                onPress={() => toggleSpecialty(item)}
+              />
+            ))}
+          </View>
+        </ScrollView>
 
-        <Text style={styles.label}>E-MAIL</Text>
-        <TextInput style={styles.input} placeholderTextColor="#64748B" placeholder="seu@email.com" keyboardType="email-address" autoCapitalize="none"
-            value={formData.email} onChangeText={t => setFormData({...formData, email: t})} />
+        <TextInput
+          style={styles.input}
+          value={form.customSpecialties}
+          onChangeText={(customSpecialties) => setForm((current) => ({ ...current, customSpecialties }))}
+          placeholder="Adicione outras especialidades separadas por virgula"
+          placeholderTextColor={colors.textSoft}
+        />
 
-        <Text style={styles.label}>CPF (Apenas números)</Text>
-        <TextInput style={styles.input} placeholderTextColor="#64748B" placeholder="00000000000" keyboardType="numeric"
-            value={formData.cpf} onChangeText={t => setFormData({...formData, cpf: t})} />
+        {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Text style={styles.label}>WHATSAPP</Text>
-        <TextInput style={styles.input} placeholderTextColor="#64748B" placeholder="11999999999" keyboardType="phone-pad"
-            value={formData.whatsapp} onChangeText={t => setFormData({...formData, whatsapp: t})} />
-
-        <Text style={styles.label}>SENHA</Text>
-        <TextInput style={styles.input} placeholderTextColor="#64748B" placeholder="******" secureTextEntry
-            value={formData.password} onChangeText={t => setFormData({...formData, password: t})} />
-
-        <TouchableOpacity style={styles.button} onPress={handleSignUp} disabled={loading}>
-          {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.buttonText}>CADASTRAR</Text>}
+        <TouchableOpacity style={styles.primaryButton} onPress={handleRegister} disabled={loading}>
+          <Text style={styles.primaryButtonText}>{loading ? 'Criando...' : 'Criar perfil profissional'}</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>Voltar para Login</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
+      </View>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F172A', padding: 20, paddingTop: 60 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#F8FAFC' },
-  subtitle: { color: '#94A3B8', marginBottom: 30 },
-  
-  // Seletor de tipo de usuário
-  userTypeContainer: { 
-    flexDirection: 'row', 
-    gap: 12, 
-    marginBottom: 25 
+  card: {
+    marginTop: 22,
+    borderRadius: 30,
+    padding: 24,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
   },
-  userTypeButton: { 
-    flex: 1, 
-    backgroundColor: '#1E293B', 
-    padding: 20, 
-    borderRadius: 12, 
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#334155'
+  eyebrow: {
+    color: colors.accent,
+    textTransform: 'uppercase',
+    fontSize: 11,
+    letterSpacing: 1.2,
+    fontWeight: '900',
   },
-  userTypeButtonActive: { 
-    backgroundColor: '#F97316', 
-    borderColor: '#F97316' 
+  title: {
+    marginTop: 10,
+    color: colors.text,
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: '800',
   },
-  userTypeEmoji: { 
-    fontSize: 32, 
+  label: {
+    marginTop: 18,
     marginBottom: 8,
-    opacity: 0.6
+    color: colors.text,
+    fontWeight: '800',
+    fontSize: 13,
   },
-  userTypeEmojiActive: {
-    opacity: 1
+  chipRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingBottom: 4,
   },
-  userTypeText: { 
-    color: '#94A3B8', 
-    fontWeight: 'bold', 
-    fontSize: 16 
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
-  userTypeTextActive: { 
-    color: '#FFF' 
+  input: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    color: colors.text,
   },
-  userTypeSubtext: { 
-    color: '#64748B', 
-    fontSize: 11, 
-    marginTop: 4 
+  error: {
+    marginTop: 12,
+    color: colors.danger,
+    fontWeight: '700',
   },
-  
-  label: { color: '#94A3B8', fontSize: 12, fontWeight: 'bold', marginBottom: 6, marginTop: 15 },
-  input: { backgroundColor: '#1E293B', color: '#FFF', padding: 15, borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
-  button: { backgroundColor: '#F97316', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 30 },
-  buttonText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
-  backButton: { marginTop: 20, alignItems: 'center' },
-  backText: { color: '#94A3B8' }
+  primaryButton: {
+    marginTop: 22,
+    borderRadius: 18,
+    backgroundColor: colors.accentStrong,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    color: colors.white,
+    fontWeight: '800',
+    fontSize: 15,
+  },
 });
+

@@ -1,473 +1,727 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Image, ScrollView, FlatList, ActivityIndicator } from 'react-native';
-import { useAuth } from '../contexts/AuthContext';
-import { StatusBar } from 'expo-status-bar';
+﻿import React, { useMemo } from 'react';
+import {
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
-import ServiceCard from '../components/ServiceCard';
-import api from '../services/api';
+import { AppScreen } from '../components/common/AppScreen';
+import { ScreenHeader } from '../components/common/ScreenHeader';
+import { SectionTitle } from '../components/common/SectionTitle';
+import { useMarketplace } from '../contexts/MarketplaceContext';
+import { colors, shadows } from '../theme/tokens';
+import { formatLeadDate } from '../utils/format';
+
+function profileCompletion(currentProvider: any) {
+  if (!currentProvider) return 0;
+  const checks = [
+    currentProvider.bio,
+    currentProvider.avatarUrl,
+    currentProvider.contact.whatsapp,
+    currentProvider.location,
+    currentProvider.specialties.length > 0,
+    currentProvider.projects.length > 0,
+  ];
+
+  const score = checks.filter(Boolean).length / checks.length;
+  return Math.round(score * 100);
+}
 
 export default function AccountScreen({ navigation }: any) {
-  const { user, signOut, updateUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'profile' | 'favorites'>('profile');
-  const [favorites, setFavorites] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { signedIn, currentProvider, currentProviderLeads, favoriteProviderIds, signOut } = useMarketplace();
 
-  useFocusEffect(
-    useCallback(() => {
-      if (activeTab === 'favorites') {
-        fetchFavorites();
-      }
-    }, [activeTab])
-  );
+  const completion = useMemo(() => profileCompletion(currentProvider), [currentProvider]);
+  const recentLeads = currentProviderLeads.slice(0, 3);
 
-  async function fetchFavorites() {
-    if (!user) return;
-    
-    setLoading(true);
-    try {
-      const response = await api.get('/favorites');
-      setFavorites(response.data || []);
-    } catch (error) {
-      console.log('Erro ao buscar favoritos:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
+  if (!signedIn || !currentProvider) {
+    return (
+      <AppScreen scroll>
+        <ScreenHeader title="Studio" subtitle="seu perfil profissional com clima de social profile" />
 
-  function handleFavoriteRemoved(serviceId: string) {
-    setFavorites(prev => prev.filter(s => s.id !== serviceId));
-  }
+        <View style={styles.guestProfileShell}>
+          <View style={styles.guestTopRow}>
+            <View style={styles.guestAvatarWrap}>
+              <Ionicons name="camera-outline" size={34} color={colors.accentStrong} />
+            </View>
+            <View style={styles.guestStatsRow}>
+              {[
+                { label: 'perfil', value: 'pro' },
+                { label: 'leads', value: 'novos' },
+                { label: 'favoritos', value: String(favoriteProviderIds.length) },
+              ].map((item) => (
+                <View key={item.label} style={styles.guestStatItem}>
+                  <Text style={styles.guestStatValue}>{item.value}</Text>
+                  <Text style={styles.guestStatLabel}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
 
-  async function handleTogglePremium() {
-    if (!user) return;
-    
-    Alert.alert(
-      'Modo Desenvolvedor',
-      `${user.isPremium ? 'Desativar' : 'Ativar'} Premium para teste?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Confirmar',
-          onPress: async () => {
-            try {
-              const response = await api.put(`/users/${user.id}/toggle-premium`);
-              Alert.alert('Sucesso', response.data.message);
-              
-              // Atualiza o contexto do usuário
-              if (updateUser) {
-                updateUser(response.data.user);
-              }
-            } catch (error: any) {
-              Alert.alert('Erro', error.response?.data?.message || 'Não foi possível alterar o status premium');
-            }
-          }
-        }
-      ]
+          <Text style={styles.guestName}>Seu Studio no VideoMap</Text>
+          <Text style={styles.guestHeadline}>Entre para publicar portfolio, receber briefs e apresentar seu trabalho com cara de perfil forte.</Text>
+          <Text style={styles.guestBio}>Clientes navegam sem atrito. Voce aparece com avatar, stats, grid de projetos e CTA direto para orcamento.</Text>
+
+          <View style={styles.guestButtonRow}>
+            <TouchableOpacity style={styles.guestPrimaryButton} onPress={() => navigation.navigate('Login')}>
+              <Text style={styles.guestPrimaryButtonText}>Entrar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.guestSecondaryButton} onPress={() => navigation.navigate('SignUp')}>
+              <Text style={styles.guestSecondaryButtonText}>Criar perfil</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <SectionTitle
+          eyebrow="Studio"
+          title="O que voce libera aqui"
+          description="Mesmo clima de perfil social, mas com foco em conversao e gestao de trabalho."
+        />
+
+        {[
+          'Avatar, bio, especialidades e portfolio em formato de grid.',
+          'Briefings organizados por etapa para responder mais rapido.',
+          'Analytics e Studio Pro para dar mais peso comercial ao perfil.',
+        ].map((item) => (
+          <View key={item} style={styles.featureCard}>
+            <Ionicons name="checkmark-circle" size={18} color={colors.accentStrong} />
+            <Text style={styles.featureText}>{item}</Text>
+          </View>
+        ))}
+      </AppScreen>
     );
   }
 
-  async function handleTestPush() {
-    if (!user) return;
-    try {
-      await api.post('/notifications/test', {
-        title: 'Teste VideoMap',
-        body: 'Se você recebeu isso, o push está funcionando.',
-      });
-      Alert.alert('Push enviado', 'Se as notificações estiverem permitidas, você deve receber em instantes.');
-    } catch (error: any) {
-      Alert.alert('Erro', error.response?.data?.message || 'Não foi possível enviar o push de teste');
-    }
-  }
+  const profileHandle = currentProvider.contact.instagram || `@${currentProvider.name.toLowerCase().replace(/\s+/g, '')}`;
 
-  function requirePremium(action: () => void) {
-    if (user?.isPremium) {
-      action();
-      return;
-    }
-    Alert.alert(
-      'Recurso Premium',
-      'Esse recurso é exclusivo do Premium. Deseja ver os benefícios?',
-      [
-        { text: 'Agora não', style: 'cancel' },
-        { text: 'Ver Premium', onPress: () => navigation.navigate('PremiumUpgrade') },
-      ],
-    );
-  }
+  const statItems = [
+    { label: 'posts', value: String(currentProvider.projects.length) },
+    { label: 'leads', value: String(currentProviderLeads.length) },
+    { label: 'perfil', value: `${completion}%` },
+  ];
 
-  function handleSignOut() {
-    Alert.alert('Sair', 'Deseja realmente sair?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sair', style: 'destructive', onPress: () => signOut() }
-    ]);
-  }
+  const highlightItems = [
+    {
+      label: 'views perfil',
+      value: String(currentProvider.metrics.profileViews),
+      icon: 'eye-outline' as const,
+    },
+    {
+      label: 'views portfolio',
+      value: String(currentProvider.metrics.portfolioViews),
+      icon: 'images-outline' as const,
+    },
+    {
+      label: 'novos leads',
+      value: String(currentProviderLeads.filter((lead) => lead.status === 'new').length),
+      icon: 'mail-unread-outline' as const,
+    },
+  ];
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
-      
-      {/* Tabs */}
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'profile' && styles.tabActive]}
-          onPress={() => setActiveTab('profile')}
-        >
-          <Ionicons name="person" size={20} color={activeTab === 'profile' ? '#FFF' : '#94A3B8'} />
-          <Text style={[styles.tabText, activeTab === 'profile' && styles.tabTextActive]}>Perfil</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'favorites' && styles.tabActive]}
-          onPress={() => setActiveTab('favorites')}
-        >
-          <Ionicons name="heart" size={20} color={activeTab === 'favorites' ? '#FFF' : '#94A3B8'} />
-          <Text style={[styles.tabText, activeTab === 'favorites' && styles.tabTextActive]}>Favoritos</Text>
-        </TouchableOpacity>
+    <AppScreen scroll>
+      <ScreenHeader
+        title={profileHandle}
+        subtitle="aba Studio do videomaker"
+        rightAction={
+          <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
+            <Ionicons name="log-out-outline" size={18} color={colors.text} />
+          </TouchableOpacity>
+        }
+      />
+
+      <View style={styles.profileShell}>
+        <View style={styles.topRow}>
+          <Image source={{ uri: currentProvider.avatarUrl }} style={styles.avatar} />
+          <View style={styles.statsRow}>
+            {statItems.map((item) => (
+              <View key={item.label} style={styles.statItem}>
+                <Text style={styles.statValue}>{item.value}</Text>
+                <Text style={styles.statLabel}>{item.label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <Text style={styles.displayName}>{currentProvider.name}</Text>
+        <Text style={styles.headline}>{currentProvider.headline}</Text>
+        <Text style={styles.bio}>{currentProvider.bio}</Text>
+
+        <View style={styles.metaWrap}>
+          <View style={styles.metaBadge}>
+            <Ionicons name="location-outline" size={14} color={colors.accentStrong} />
+            <Text style={styles.metaBadgeText}>{currentProvider.location}</Text>
+          </View>
+          <View style={styles.metaBadge}>
+            <Ionicons name="ribbon-outline" size={14} color={colors.accentStrong} />
+            <Text style={styles.metaBadgeText}>{currentProvider.experienceLevel}</Text>
+          </View>
+          <View style={styles.metaBadge}>
+            <Ionicons name="sparkles-outline" size={14} color={colors.accentStrong} />
+            <Text style={styles.metaBadgeText}>{currentProvider.availabilityLabel}</Text>
+          </View>
+        </View>
+
+        <View style={styles.buttonRow}>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('EditProfile')}>
+            <Text style={styles.primaryButtonText}>Editar perfil</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryButtonWide} onPress={() => navigation.navigate('NewService')}>
+            <Text style={styles.secondaryButtonWideText}>Novo projeto</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryButtonWide} onPress={() => navigation.navigate('LeadsManagement')}>
+            <Text style={styles.secondaryButtonWideText}>Leads</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.actionPillsRow}>
+          <TouchableOpacity style={styles.actionPill} onPress={() => navigation.navigate('AnalyticsDashboard')}>
+            <Ionicons name="stats-chart-outline" size={15} color={colors.accentStrong} />
+            <Text style={styles.actionPillText}>Analytics</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionPill} onPress={() => navigation.navigate('PremiumUpgrade')}>
+            <Ionicons name="flash-outline" size={15} color={colors.accentStrong} />
+            <Text style={styles.actionPillText}>{currentProvider.isPro ? 'Studio Pro ativo' : 'Ativar Studio Pro'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {activeTab === 'profile' ? (
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.header}>
-            {user?.avatarUrl ? (
-              <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
-            ) : (
-              <View style={styles.avatarContainer}>
-                <Text style={styles.avatarText}>{user?.name ? user.name.charAt(0).toUpperCase() : 'U'}</Text>
-              </View>
-            )}
-            <Text style={styles.name}>{user?.name || 'Visitante'}</Text>
-            <Text style={styles.email}>{user?.email || 'Faça login'}</Text>
-            
-            {user?.bio && <Text style={styles.bio}>{user.bio}</Text>}
-            
-            {user?.city && (
-              <View style={styles.locationRow}>
-                <Ionicons name="location" size={14} color="#94A3B8" />
-                <Text style={styles.location}>{user.city}</Text>
-              </View>
-            )}
-            
-            <TouchableOpacity style={styles.editButton} onPress={() => navigation.navigate('EditProfile')}>
-              <Ionicons name="create-outline" size={18} color="#FFF" />
-              <Text style={styles.editButtonText}>Editar Perfil</Text>
-            </TouchableOpacity>
-
-            {/* Botão DEV: Toggle Premium (somente desenvolvimento) */}
-            {__DEV__ && user?.role === 'PROVIDER' && (
-              <TouchableOpacity 
-                style={[styles.devButton, user?.isPremium && styles.devButtonActive]} 
-                onPress={handleTogglePremium}
-                onLongPress={handleTogglePremium}
-              >
-                <Ionicons 
-                  name={user?.isPremium ? "diamond" : "diamond-outline"} 
-                  size={16} 
-                  color={user?.isPremium ? "#F97316" : "#64748B"} 
-                />
-                <Text style={styles.devButtonText}>
-                  DEV: {user?.isPremium ? 'Desativar' : 'Ativar'} Premium
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {/* Botão DEV: Testar Push */}
-            {__DEV__ && !!user && (
-              <TouchableOpacity style={styles.devButton} onPress={handleTestPush}>
-                <Ionicons name="notifications-outline" size={16} color="#64748B" />
-                <Text style={styles.devButtonText}>DEV: Testar Push</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Premium Badge (if user is premium) */}
-          {user?.isPremium && (
-            <View style={styles.premiumBanner}>
-              <Ionicons name="diamond" size={24} color="#F97316" />
-              <Text style={styles.premiumBannerText}>Você é Premium!</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.highlightsScroller}>
+        <View style={styles.highlightsRow}>
+          {highlightItems.map((item) => (
+            <View key={item.label} style={styles.highlightBubble}>
+              <Ionicons name={item.icon} size={18} color={colors.accentStrong} />
+              <Text style={styles.highlightLabel}>{item.label}</Text>
+              <Text style={styles.highlightValue}>{item.value}</Text>
             </View>
-          )}
+          ))}
+        </View>
+      </ScrollView>
 
-          {/* Provider Menu */}
-          {user?.role === 'PROVIDER' && (
-            <View style={styles.menu}>
-              {!user?.isPremium && (
-                <TouchableOpacity 
-                  style={[styles.menuItem, styles.premiumMenuItem]} 
-                  onPress={() => navigation.navigate('PremiumUpgrade')}
-                >
-                  <View style={styles.menuItemLeft}>
-                    <Ionicons name="diamond" size={22} color="#F97316" />
-                    <Text style={styles.menuItemText}>Torne-se Premium</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-                </TouchableOpacity>
-              )}
+      <SectionTitle
+        eyebrow="Briefings"
+        title="Leads recentes"
+        description="Os contatos mais frescos para voce manter o timing comercial."
+      />
 
-              <TouchableOpacity 
-                style={styles.menuItem} 
-                onPress={() => requirePremium(() => navigation.navigate('AnalyticsDashboard'))}
-              >
-                <View style={styles.menuItemLeft}>
-                  <Ionicons name="analytics" size={22} color="#3B82F6" />
-                  <Text style={styles.menuItemText}>Analytics</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.menuItem} 
-                onPress={() => requirePremium(() => navigation.navigate('LeadsManagement'))}
-              >
-                <View style={styles.menuItemLeft}>
-                  <Ionicons name="briefcase" size={22} color="#8B5CF6" />
-                  <Text style={styles.menuItemText}>Orçamentos</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <View style={styles.menu}>
-            <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
-              <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-              <Text style={styles.logoutText}>Sair da Conta</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+      {recentLeads.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>Ainda sem briefs novos por aqui.</Text>
+          <Text style={styles.emptyText}>Quando clientes enviarem pedidos, eles vao aparecer aqui em formato de inbox rapido.</Text>
+        </View>
       ) : (
-        <View style={styles.favoritesContainer}>
-          {loading ? (
-            <ActivityIndicator size="large" color="#F97316" style={{ marginTop: 50 }} />
-          ) : favorites.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="heart-outline" size={64} color="#334155" />
-              <Text style={styles.emptyText}>Nenhum favorito ainda</Text>
-              <Text style={styles.emptySubtext}>Adicione serviços aos favoritos para vê-los aqui</Text>
+        recentLeads.map((lead) => (
+          <View key={lead.id} style={styles.leadCard}>
+            <View style={styles.leadHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.leadName}>{lead.clientName}</Text>
+                <Text style={styles.leadMeta}>{formatLeadDate(lead.createdAt)}</Text>
+              </View>
+              <View style={styles.leadBadge}>
+                <Text style={styles.leadBadgeText}>{lead.status}</Text>
+              </View>
             </View>
-          ) : (
-            <FlatList
-              data={favorites}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <ServiceCard
-                  data={item}
-                  onPress={() => navigation.navigate('Details', { service: item })}
-                  isFavorited={true}
-                  onFavoriteChange={(isFav) => {
-                    if (!isFav) handleFavoriteRemoved(item.id);
-                  }}
-                />
-              )}
-              contentContainerStyle={styles.favoritesList}
-            />
-          )}
+            <Text style={styles.leadBrief} numberOfLines={3}>{lead.brief}</Text>
+            <Text style={styles.leadContact}>{lead.clientPhone || lead.clientEmail || 'contato no app'}</Text>
+          </View>
+        ))
+      )}
+
+      <SectionTitle
+        eyebrow="Portfolio"
+        title="Grid do Studio"
+        description="Mesmo clima de perfil social, mas com foco em publicar cases que ajudam a vender."
+      />
+
+      <View style={styles.gridHeader}>
+        <View style={styles.gridTabActive}>
+          <Ionicons name="grid-outline" size={16} color={colors.accentStrong} />
+          <Text style={styles.gridTabActiveText}>posts</Text>
+        </View>
+        <Text style={styles.gridHint}>{currentProvider.projects.length} projetos publicados</Text>
+      </View>
+
+      {currentProvider.projects.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>Seu portfolio ainda esta vazio.</Text>
+          <Text style={styles.emptyText}>Publique o primeiro projeto para transformar a aba Studio numa vitrine real.</Text>
+        </View>
+      ) : (
+        <View style={styles.projectGrid}>
+          {currentProvider.projects.map((project, index) => (
+            <TouchableOpacity
+              key={project.id}
+              style={styles.projectTile}
+              onPress={() => navigation.navigate('Details', { providerId: currentProvider.id, projectId: project.id })}
+              activeOpacity={0.9}
+            >
+              <Image source={{ uri: project.coverUrl }} style={styles.projectImage} />
+              <View style={styles.projectTopBadges}>
+                {project.videoUrl ? (
+                  <View style={styles.projectIconBadge}>
+                    <Ionicons name="play" size={12} color={colors.white} />
+                  </View>
+                ) : null}
+                {project.featured || index === 0 ? (
+                  <View style={styles.projectIconBadge}>
+                    <Ionicons name="sparkles" size={12} color={colors.white} />
+                  </View>
+                ) : null}
+              </View>
+              <View style={styles.projectOverlay}>
+                <Text style={styles.projectTitle} numberOfLines={2}>{project.title}</Text>
+                <Text style={styles.projectMeta}>{project.category}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
         </View>
       )}
-    </View>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F172A' },
-  
-  tabsContainer: {
+  guestProfileShell: {
+    borderRadius: 28,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 18,
+    ...shadows.card,
+  },
+  guestTopRow: {
     flexDirection: 'row',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 15,
-    backgroundColor: '#1E293B',
-    borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    alignItems: 'center',
+    gap: 18,
+  },
+  guestAvatarWrap: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.accent,
+  },
+  guestStatsRow: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  guestStatItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  guestStatValue: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  guestStatLabel: {
+    marginTop: 4,
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  guestName: {
+    marginTop: 18,
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  guestHeadline: {
+    marginTop: 6,
+    color: colors.text,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  guestBio: {
+    marginTop: 10,
+    color: colors.textMuted,
+    lineHeight: 22,
+  },
+  guestButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 18,
+  },
+  guestPrimaryButton: {
+    flex: 1,
+    borderRadius: 14,
+    backgroundColor: colors.accentStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+  },
+  guestPrimaryButtonText: {
+    color: colors.white,
+    fontWeight: '800',
+  },
+  guestSecondaryButton: {
+    flex: 1,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+  },
+  guestSecondaryButtonText: {
+    color: colors.text,
+    fontWeight: '800',
+  },
+  featureCard: {
+    marginBottom: 12,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
   },
-  tab: {
+  featureText: {
+    flex: 1,
+    color: colors.text,
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  signOutButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  profileShell: {
+    borderRadius: 28,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 18,
+    ...shadows.card,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
+  },
+  avatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 2,
+    borderColor: colors.accent,
+  },
+  statsRow: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  statLabel: {
+    marginTop: 4,
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  displayName: {
+    marginTop: 18,
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  headline: {
+    marginTop: 6,
+    color: colors.text,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  bio: {
+    marginTop: 10,
+    color: colors.textMuted,
+    lineHeight: 22,
+  },
+  metaWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 14,
+  },
+  metaBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.surface,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  metaBadgeText: {
+    color: colors.textMuted,
+    fontWeight: '700',
+  },
+  buttonRow: {
+    marginTop: 16,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  primaryButton: {
+    flex: 1,
+    borderRadius: 14,
+    backgroundColor: colors.accentStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+  },
+  primaryButtonText: {
+    color: colors.white,
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  secondaryButtonWide: {
+    flex: 1,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+  },
+  secondaryButtonWideText: {
+    color: colors.text,
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  actionPillsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  actionPill: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#0F172A',
+    borderRadius: 999,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.border,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
-  tabActive: {
-    backgroundColor: '#F97316',
-    borderColor: '#F97316',
+  actionPillText: {
+    color: colors.text,
+    fontWeight: '800',
+    fontSize: 12,
   },
-  tabText: {
-    color: '#94A3B8',
-    fontSize: 15,
-    fontWeight: '600',
+  highlightsScroller: {
+    marginTop: 18,
+    marginBottom: 8,
   },
-  tabTextActive: {
-    color: '#FFF',
+  highlightsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingRight: 6,
   },
-  
-  scrollContent: {
-    padding: 20,
-  },
-  header: { alignItems: 'center', marginBottom: 40 },
-  avatar: {
+  highlightBubble: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    borderWidth: 3,
-    borderColor: '#F97316',
-    marginBottom: 16,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    ...shadows.soft,
   },
-  avatarContainer: { 
-    width: 100, 
-    height: 100, 
-    borderRadius: 50, 
-    backgroundColor: '#F97316', 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginBottom: 16 
-  },
-  avatarText: { fontSize: 40, color: '#FFF', fontWeight: 'bold' },
-  name: { fontSize: 24, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 4 },
-  email: { fontSize: 14, color: '#94A3B8', marginBottom: 8 },
-  bio: {
-    fontSize: 14,
-    color: '#CBD5E1',
+  highlightLabel: {
+    marginTop: 8,
+    color: colors.textSoft,
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
     textAlign: 'center',
-    marginBottom: 8,
-    paddingHorizontal: 20,
   },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 16,
+  highlightValue: {
+    marginTop: 4,
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
   },
-  location: {
-    color: '#94A3B8',
-    fontSize: 13,
-  },
-  editButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#1E293B',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+  leadCard: {
+    borderRadius: 24,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.border,
+    padding: 18,
+    marginBottom: 12,
   },
-  editButtonText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  devButton: {
+  leadHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(100, 116, 139, 0.1)',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#334155',
-    marginTop: 12,
-  },
-  devButtonActive: {
-    backgroundColor: 'rgba(249, 115, 22, 0.1)',
-    borderColor: '#F97316',
-  },
-  devButtonText: {
-    color: '#64748B',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  premiumBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    backgroundColor: 'rgba(249, 115, 22, 0.1)',
-    paddingVertical: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#F97316',
-    marginBottom: 20,
-  },
-  premiumBannerText: {
-    color: '#F97316',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  menu: { gap: 12, marginBottom: 20 },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1E293B',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  premiumMenuItem: {
-    borderColor: '#F97316',
-    borderWidth: 2,
-  },
-  menuItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 12,
   },
-  menuItemText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
+  leadName: {
+    color: colors.text,
+    fontWeight: '800',
+    fontSize: 17,
   },
-  logoutButton: { 
+  leadMeta: {
+    marginTop: 4,
+    color: colors.textSoft,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  leadBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: colors.accentSoft,
+    alignSelf: 'flex-start',
+  },
+  leadBadgeText: {
+    color: colors.accentStrong,
+    fontWeight: '900',
+    fontSize: 10,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  leadBrief: {
+    marginTop: 10,
+    color: colors.textMuted,
+    lineHeight: 20,
+  },
+  leadContact: {
+    marginTop: 12,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  gridHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  gridTabActive: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#1E293B',
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#EF4444',
+    borderColor: colors.border,
   },
-  logoutText: { 
-    color: '#EF4444', 
-    fontSize: 16,
-    fontWeight: 'bold' 
+  gridTabActiveText: {
+    color: colors.text,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    fontSize: 12,
+    letterSpacing: 0.6,
   },
-  
-  favoritesContainer: {
-    flex: 1,
+  gridHint: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '700',
   },
-  favoritesList: {
-    padding: 20,
-    paddingBottom: 100,
+  emptyCard: {
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 18,
+    marginBottom: 18,
   },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    paddingTop: 100,
+  emptyTitle: {
+    color: colors.text,
+    fontWeight: '800',
+    fontSize: 18,
   },
   emptyText: {
-    color: '#CBD5E1',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 20,
-  },
-  emptySubtext: {
-    color: '#64748B',
-    fontSize: 14,
-    textAlign: 'center',
     marginTop: 8,
+    color: colors.textMuted,
+    lineHeight: 20,
+  },
+  projectGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 10,
+    marginBottom: 28,
+  },
+  projectTile: {
+    width: '31.7%',
+    aspectRatio: 1,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceStrong,
+    position: 'relative',
+  },
+  projectImage: {
+    width: '100%',
+    height: '100%',
+  },
+  projectTopBadges: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    right: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  projectIconBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.58)',
+  },
+  projectOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.58)',
+  },
+  projectTitle: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: '800',
+    lineHeight: 14,
+  },
+  projectMeta: {
+    marginTop: 3,
+    color: 'rgba(255,255,255,0.74)',
+    fontSize: 10,
+    fontWeight: '700',
   },
 });

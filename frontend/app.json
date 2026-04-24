@@ -3,22 +3,31 @@
     "name": "VideoMap",
     "slug": "videomap",
     "version": "1.0.0",
+    "icon": "./assets/icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "splash": {
       "resizeMode": "contain",
-      "backgroundColor": "#0F172A"
+      "backgroundColor": "#081f6c"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.videomap.app"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0F172A"
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#081f6c"
       },
       "package": "com.videomap.app"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "714cdcdd-e489-42a0-ab88-dcd3eee3112b"
+      }
     }
   }
 }

@@ -1,393 +1,138 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { StatusBar } from 'expo-status-bar';
-import api from '../services/api';
+import React, { useMemo } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { AppScreen } from '../components/common/AppScreen';
+import { MetricCard } from '../components/common/MetricCard';
+import { ScreenHeader } from '../components/common/ScreenHeader';
+import { SectionTitle } from '../components/common/SectionTitle';
+import { useMarketplace } from '../contexts/MarketplaceContext';
+import { colors } from '../theme/tokens';
 
 export default function AnalyticsDashboardScreen({ navigation }: any) {
-  const [analytics, setAnalytics] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [period, setPeriod] = useState(30);
+  const { currentProvider, currentProviderLeads, favoriteProviderIds } = useMarketplace();
 
-  useEffect(() => {
-    fetchAnalytics();
-  }, [period]);
+  const data = useMemo(() => {
+    if (!currentProvider) return null;
 
-  async function fetchAnalytics() {
-    try {
-      const response = await api.get(`/analytics/provider?days=${period}`);
-      setAnalytics(response.data);
-    } catch (error) {
-      console.log('Erro ao buscar analytics:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }
+    const newLeads = currentProviderLeads.filter((lead) => lead.status === 'new').length;
+    const contactedLeads = currentProviderLeads.filter((lead) => lead.status === 'contacted').length;
+    const proposalLeads = currentProviderLeads.filter((lead) => lead.status === 'proposal').length;
+    const closedLeads = currentProviderLeads.filter((lead) => lead.status === 'closed').length;
 
-  function onRefresh() {
-    setRefreshing(true);
-    fetchAnalytics();
-  }
+    const averageViews = currentProvider.projects.length
+      ? Math.round(currentProvider.metrics.portfolioViews / currentProvider.projects.length)
+      : 0;
 
-  const periods = [
-    { label: '7 dias', value: 7 },
-    { label: '30 dias', value: 30 },
-    { label: '90 dias', value: 90 },
-  ];
+    return {
+      newLeads,
+      contactedLeads,
+      proposalLeads,
+      closedLeads,
+      averageViews,
+      favorites: favoriteProviderIds.includes(currentProvider.id) ? 1 : 0,
+    };
+  }, [currentProvider, currentProviderLeads, favoriteProviderIds]);
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <StatusBar style="light" />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#F97316" />
-        </View>
-      </View>
-    );
+  if (!currentProvider || !data) {
+    return null;
   }
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
-      
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Analytics</Text>
-        <Ionicons name="stats-chart" size={24} color="#F97316" />
+    <AppScreen scroll>
+      <ScreenHeader title="Analytics" subtitle="Leituras simples sobre interesse, portfolio e leads." onBack={() => navigation.goBack()} />
+
+      <View style={styles.heroCard}>
+        <Text style={styles.heroEyebrow}>Resumo da semana</Text>
+        <Text style={styles.heroTitle}>{currentProvider.metrics.profileViews} visitas no perfil e {currentProviderLeads.length} leads mapeados.</Text>
+        <Text style={styles.heroText}>Use isso para decidir quais projetos merecem mais destaque e em que etapa cada contato esta.</Text>
       </View>
 
-      <View style={styles.periodSelector}>
-        {periods.map((p) => (
-          <TouchableOpacity
-            key={p.value}
-            style={[styles.periodButton, period === p.value && styles.periodButtonActive]}
-            onPress={() => setPeriod(p.value)}
-          >
-            <Text style={[styles.periodText, period === p.value && styles.periodTextActive]}>
-              {p.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.metricsGrid}>
+        <MetricCard label="leads novos" value={String(data.newLeads)} accent="accent" />
+        <MetricCard label="leads em proposta" value={String(data.proposalLeads)} accent="sage" />
+        <MetricCard label="projetos publicados" value={String(currentProvider.projects.length)} accent="gold" />
       </View>
 
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={{ paddingBottom: 100 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F97316" />
-        }
-      >
-        {/* Services Stats */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Serviços</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Ionicons name="film" size={32} color="#F97316" />
-              <Text style={styles.statValue}>{analytics?.services?.total || 0}</Text>
-              <Text style={styles.statLabel}>Total</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Ionicons name="checkmark-circle" size={32} color="#10B981" />
-              <Text style={styles.statValue}>{analytics?.services?.active || 0}</Text>
-              <Text style={styles.statLabel}>Ativos</Text>
-            </View>
-          </View>
-        </View>
+      <View style={styles.metricsGrid}>
+        <MetricCard label="media de views por projeto" value={String(data.averageViews)} accent="sage" />
+        <MetricCard label="contatos fechados" value={String(data.closedLeads)} accent="accent" />
+        <MetricCard label="favoritos no app" value={String(data.favorites)} accent="gold" />
+      </View>
 
-        {/* Engagement Stats */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Engajamento</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statBox}>
-              <Ionicons name="eye" size={24} color="#3B82F6" />
-              <Text style={styles.statBoxValue}>{analytics?.engagement?.totalViews || 0}</Text>
-              <Text style={styles.statBoxLabel}>Visualizações</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Ionicons name="logo-whatsapp" size={24} color="#10B981" />
-              <Text style={styles.statBoxValue}>{analytics?.engagement?.totalWhatsappClicks || 0}</Text>
-              <Text style={styles.statBoxLabel}>Cliques WhatsApp</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Ionicons name="trending-up" size={24} color="#F59E0B" />
-              <Text style={styles.statBoxValue}>{analytics?.engagement?.conversionRate || 0}%</Text>
-              <Text style={styles.statBoxLabel}>Taxa Conversão</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Ionicons name="heart" size={24} color="#EF4444" />
-              <Text style={styles.statBoxValue}>{analytics?.engagement?.totalFavorites || 0}</Text>
-              <Text style={styles.statBoxLabel}>Favoritos</Text>
-            </View>
-          </View>
-        </View>
+      <SectionTitle
+        eyebrow="Leitura rapida"
+        title="O que fazer com esses numeros"
+        description="A ideia aqui nao e encher de graficos, e sim te mostrar o que mexe na conversao."
+      />
 
-        {/* Leads Stats */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Orçamentos</Text>
-          <View style={styles.statsRow}>
-            <View style={[styles.statCard, { flex: 1.5 }]}>
-              <Ionicons name="briefcase" size={32} color="#F97316" />
-              <Text style={styles.statValue}>{analytics?.leads?.total || 0}</Text>
-              <Text style={styles.statLabel}>Total</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Ionicons name="time" size={32} color="#F59E0B" />
-              <Text style={styles.statValue}>{analytics?.leads?.pending || 0}</Text>
-              <Text style={styles.statLabel}>Pendentes</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Ionicons name="checkmark-done" size={32} color="#10B981" />
-              <Text style={styles.statValue}>{analytics?.leads?.completed || 0}</Text>
-              <Text style={styles.statLabel}>Concluídos</Text>
-            </View>
-          </View>
-          
-          <View style={styles.budgetCard}>
-            <Text style={styles.budgetLabel}>Orçamento Total Recebido</Text>
-            <Text style={styles.budgetValue}>R$ {analytics?.leads?.totalBudget?.toFixed(2) || '0.00'}</Text>
-          </View>
-        </View>
-
-        {/* Reviews Stats */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Avaliações</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Ionicons name="star" size={32} color="#F59E0B" />
-              <Text style={styles.statValue}>{analytics?.reviews?.averageRating || '0.0'}</Text>
-              <Text style={styles.statLabel}>Média</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Ionicons name="chatbox" size={32} color="#8B5CF6" />
-              <Text style={styles.statValue}>{analytics?.reviews?.total || 0}</Text>
-              <Text style={styles.statLabel}>Total</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Top Services */}
-        {analytics?.topServices && analytics.topServices.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Top Serviços</Text>
-            {analytics.topServices.map((service: any, index: number) => (
-              <View key={service.id} style={styles.topServiceCard}>
-                <View style={styles.topServiceRank}>
-                  <Text style={styles.topServiceRankText}>{index + 1}</Text>
-                </View>
-                <View style={styles.topServiceInfo}>
-                  <Text style={styles.topServiceTitle} numberOfLines={1}>{service.title}</Text>
-                  <View style={styles.topServiceStats}>
-                    <View style={styles.topServiceStat}>
-                      <Ionicons name="eye" size={14} color="#64748B" />
-                      <Text style={styles.topServiceStatText}>{service.views}</Text>
-                    </View>
-                    <View style={styles.topServiceStat}>
-                      <Ionicons name="logo-whatsapp" size={14} color="#10B981" />
-                      <Text style={styles.topServiceStatText}>{service.whatsappClicks}</Text>
-                    </View>
-                    <Text style={styles.topServiceConversion}>{service.conversionRate}%</Text>
-                  </View>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
-    </View>
+      <View style={styles.insightCard}>
+        <Text style={styles.insightTitle}>1. Portfolio com mais chance de gerar conversa</Text>
+        <Text style={styles.insightText}>
+          Os projetos de capa costumam receber mais atencao. Se quiser melhorar a conversao, mantenha na frente os cases mais alinhados ao tipo de cliente que voce quer atrair.
+        </Text>
+      </View>
+      <View style={styles.insightCard}>
+        <Text style={styles.insightTitle}>2. Leads sem resposta rapida esfriam</Text>
+        <Text style={styles.insightText}>
+          Hoje voce tem {data.newLeads} leads novos e {data.contactedLeads} em contato. Vale responder os novos primeiro para nao perder timing.
+        </Text>
+      </View>
+      <View style={styles.insightCard}>
+        <Text style={styles.insightTitle}>3. Atualize o portfolio regularmente</Text>
+        <Text style={styles.insightText}>
+          Perfis com portfolio ativo passam mais confianca. Sempre que finalizar um trabalho forte, publique um case novo ou substitua a capa principal.
+        </Text>
+      </View>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0F172A',
+  heroCard: {
+    borderRadius: 28,
+    backgroundColor: colors.surfaceDark,
+    padding: 22,
+    marginBottom: 22,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    paddingTop: 50,
-    backgroundColor: '#1E293B',
-    borderBottomWidth: 1,
-    borderBottomColor: '#334155',
-  },
-  headerTitle: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  periodSelector: {
-    flexDirection: 'row',
-    padding: 16,
-    gap: 8,
-    backgroundColor: '#1E293B',
-  },
-  periodButton: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#0F172A',
-    alignItems: 'center',
-  },
-  periodButtonActive: {
-    backgroundColor: '#F97316',
-  },
-  periodText: {
-    color: '#94A3B8',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  periodTextActive: {
-    color: '#FFF',
-  },
-  content: {
-    flex: 1,
-  },
-  section: {
-    padding: 16,
-  },
-  sectionTitle: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  statValue: {
-    color: '#FFF',
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginVertical: 8,
-  },
-  statLabel: {
-    color: '#94A3B8',
-    fontSize: 12,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  statBox: {
-    width: '48%',
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  statBoxValue: {
-    color: '#FFF',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginTop: 8,
-  },
-  statBoxLabel: {
-    color: '#94A3B8',
+  heroEyebrow: {
+    color: colors.gold,
+    textTransform: 'uppercase',
+    fontWeight: '900',
     fontSize: 11,
-    marginTop: 4,
-    textAlign: 'center',
+    letterSpacing: 1.1,
   },
-  budgetCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 20,
-    marginTop: 12,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#10B981',
+  heroTitle: {
+    marginTop: 10,
+    color: colors.white,
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '800',
   },
-  budgetLabel: {
-    color: '#94A3B8',
-    fontSize: 14,
-    marginBottom: 8,
+  heroText: {
+    marginTop: 10,
+    color: 'rgba(255,255,255,0.78)',
+    lineHeight: 21,
   },
-  budgetValue: {
-    color: '#10B981',
-    fontSize: 32,
-    fontWeight: 'bold',
-  },
-  topServiceCard: {
+  metricsGrid: {
     flexDirection: 'row',
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    alignItems: 'center',
-    gap: 12,
+    gap: 10,
+    marginBottom: 10,
+  },
+  insightCard: {
+    marginBottom: 12,
+    borderRadius: 24,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.border,
+    padding: 18,
   },
-  topServiceRank: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F97316',
-    justifyContent: 'center',
-    alignItems: 'center',
+  insightTitle: {
+    color: colors.text,
+    fontWeight: '800',
+    fontSize: 18,
   },
-  topServiceRankText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  topServiceInfo: {
-    flex: 1,
-  },
-  topServiceTitle: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  topServiceStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  topServiceStat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  topServiceStatText: {
-    color: '#64748B',
-    fontSize: 12,
-  },
-  topServiceConversion: {
-    color: '#10B981',
-    fontSize: 12,
-    fontWeight: 'bold',
+  insightText: {
+    marginTop: 8,
+    color: colors.textMuted,
+    lineHeight: 21,
   },
 });

@@ -1,83 +1,146 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { useAuth } from '../contexts/AuthContext';
+﻿import React, { useState } from 'react';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { AppScreen } from '../components/common/AppScreen';
+import { ScreenHeader } from '../components/common/ScreenHeader';
+import { useMarketplace } from '../contexts/MarketplaceContext';
+import { colors, shadows } from '../theme/tokens';
 
 export default function LoginScreen({ navigation }: any) {
-  const { signIn } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const { signIn } = useMarketplace();
+  const [email, setEmail] = useState('videomaker@videomap.local');
+  const [password, setPassword] = useState('123456');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function handleLogin() {
-    if (!email || !password) {
-      return Alert.alert('Atenção', 'Preencha todos os campos');
-    }
-    
     setLoading(true);
+    setError('');
     try {
       await signIn(email, password);
-    } catch (error: any) {
-      Alert.alert('Erro', error.message);
+      navigation.replace('Main');
+    } catch (err: any) {
+      setError(err.message || 'Nao foi possivel entrar.');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
-      
-      <View style={styles.header}>
-        <Text style={styles.title}>VIDEOMAP</Text>
-        <Text style={styles.subtitle}>Faça login para continuar</Text>
-      </View>
+    <AppScreen scroll>
+      <ScreenHeader title="Entrar" subtitle="Acesso do videomaker ao studio." onBack={() => navigation.goBack()} />
+      <View style={styles.card}>
+        <Text style={styles.eyebrow}>Acesso profissional</Text>
+        <Text style={styles.title}>Entre para editar perfil, publicar portfolio e responder leads.</Text>
+        <Text style={styles.helper}>Demo pronta para testar: videomaker@videomap.local / 123456</Text>
 
-      <View style={styles.form}>
-        <Text style={styles.label}>E-MAIL</Text>
-        <TextInput 
+        <Text style={styles.label}>Email</Text>
+        <TextInput
           style={styles.input}
-          placeholder="exemplo@email.com"
-          placeholderTextColor="#64748B"
-          autoCapitalize="none"
-          keyboardType="email-address"
           value={email}
           onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          placeholder="voce@studio.com"
+          placeholderTextColor={colors.textSoft}
         />
 
-        <Text style={styles.label}>SENHA</Text>
-        <TextInput 
+        <Text style={styles.label}>Senha</Text>
+        <TextInput
           style={styles.input}
-          placeholder="********"
-          placeholderTextColor="#64748B"
-          secureTextEntry
           value={password}
           onChangeText={setPassword}
+          secureTextEntry
+          placeholder="Sua senha"
+          placeholderTextColor={colors.textSoft}
         />
 
-        <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-          {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.buttonText}>ENTRAR</Text>}
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        <TouchableOpacity style={styles.primaryButton} onPress={handleLogin} disabled={loading}>
+          <Text style={styles.primaryButtonText}>{loading ? 'Entrando...' : 'Entrar no studio'}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.footerLink} onPress={() => navigation.navigate('SignUp')}>
-          <Text style={styles.footerText}>Não tem conta? <Text style={styles.linkBold}>Crie agora</Text></Text>
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('SignUp')}>
+          <Text style={styles.secondaryButtonText}>Criar novo perfil profissional</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F172A', justifyContent: 'center', padding: 20 },
-  header: { alignItems: 'center', marginBottom: 40 },
-  title: { fontSize: 32, fontWeight: '900', color: '#F8FAFC', letterSpacing: 2 },
-  subtitle: { color: '#94A3B8', marginTop: 5 },
-  form: { width: '100%' },
-  label: { color: '#94A3B8', fontSize: 12, fontWeight: 'bold', marginBottom: 6, marginTop: 15 },
-  input: { backgroundColor: '#1E293B', color: '#FFF', padding: 15, borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
-  button: { backgroundColor: '#F97316', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 30 },
-  buttonText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
-  footerLink: { marginTop: 20, alignItems: 'center' },
-  footerText: { color: '#94A3B8' },
-  linkBold: { color: '#F97316', fontWeight: 'bold' }
+  card: {
+    marginTop: 34,
+    borderRadius: 30,
+    padding: 24,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  eyebrow: {
+    color: colors.accent,
+    textTransform: 'uppercase',
+    fontSize: 11,
+    letterSpacing: 1.2,
+    fontWeight: '900',
+  },
+  title: {
+    marginTop: 10,
+    color: colors.text,
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: '800',
+  },
+  helper: {
+    marginTop: 12,
+    color: colors.textMuted,
+    lineHeight: 20,
+  },
+  label: {
+    marginTop: 18,
+    marginBottom: 8,
+    color: colors.text,
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  input: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    color: colors.text,
+  },
+  error: {
+    marginTop: 12,
+    color: colors.danger,
+    fontWeight: '700',
+  },
+  primaryButton: {
+    marginTop: 22,
+    borderRadius: 18,
+    backgroundColor: colors.accentStrong,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    color: colors.white,
+    fontWeight: '800',
+    fontSize: 15,
+  },
+  secondaryButton: {
+    marginTop: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    color: colors.text,
+    fontWeight: '800',
+  },
 });
+

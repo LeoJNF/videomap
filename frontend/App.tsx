@@ -1,14 +1,13 @@
 import React from 'react';
-import { AuthProvider } from './src/contexts/AuthContext';
+import { StatusBar } from 'expo-status-bar';
+import { MarketplaceProvider } from './src/contexts/MarketplaceContext';
 import Routes from './src/navigation/Routes';
-import { configureNotifications } from './src/services/pushNotifications';
-
-configureNotifications();
 
 export default function App() {
   return (
-    <AuthProvider>
+    <MarketplaceProvider>
+      <StatusBar style="dark" />
       <Routes />
-    </AuthProvider>
+    </MarketplaceProvider>
   );
 }

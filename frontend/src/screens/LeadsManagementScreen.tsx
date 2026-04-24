@@ -1,428 +1,166 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  TouchableOpacity, 
-  RefreshControl,
-  ActivityIndicator,
-  Alert
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { StatusBar } from 'expo-status-bar';
-import api from '../services/api';
+﻿import React, { useMemo, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AppScreen } from '../components/common/AppScreen';
+import { EmptyState } from '../components/common/EmptyState';
+import { FilterChip } from '../components/common/FilterChip';
+import { ScreenHeader } from '../components/common/ScreenHeader';
+import { SectionTitle } from '../components/common/SectionTitle';
+import { useMarketplace } from '../contexts/MarketplaceContext';
+import { LeadStatus } from '../types/marketplace';
+import { colors } from '../theme/tokens';
+import { formatLeadDate } from '../utils/format';
+
+const filters: Array<{ label: string; value: 'all' | LeadStatus }> = [
+  { label: 'Todos', value: 'all' },
+  { label: 'Novos', value: 'new' },
+  { label: 'Contactados', value: 'contacted' },
+  { label: 'Proposta', value: 'proposal' },
+  { label: 'Fechados', value: 'closed' },
+];
 
 export default function LeadsManagementScreen({ navigation }: any) {
-  const [leads, setLeads] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<string>('all');
+  const { currentProviderLeads, updateLeadStatus } = useMarketplace();
+  const [filter, setFilter] = useState<'all' | LeadStatus>('all');
 
-  useEffect(() => {
-    fetchLeads();
-    fetchStats();
-  }, [filter]);
-
-  async function fetchLeads() {
-    try {
-      const params = filter !== 'all' ? `?status=${filter}` : '';
-      const response = await api.get(`/leads/provider${params}`);
-      setLeads(response.data);
-    } catch (error) {
-      console.log('Erro ao buscar leads:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }
-
-  async function fetchStats() {
-    try {
-      const response = await api.get('/leads/provider/stats');
-      setStats(response.data);
-    } catch (error) {
-      console.log('Erro ao buscar stats:', error);
-    }
-  }
-
-  async function handleUpdateStatus(leadId: string, newStatus: string) {
-    try {
-      await api.put(`/leads/${leadId}/status`, { status: newStatus });
-      fetchLeads();
-      fetchStats();
-      Alert.alert('Sucesso', 'Status atualizado');
-    } catch (error) {
-      Alert.alert('Erro', 'Não foi possível atualizar o status');
-    }
-  }
-
-  function onRefresh() {
-    setRefreshing(true);
-    fetchLeads();
-    fetchStats();
-  }
-
-  function renderLead({ item }: any) {
-    const statusColors: any = {
-      pending: '#F59E0B',
-      contacted: '#3B82F6',
-      accepted: '#10B981',
-      rejected: '#EF4444',
-      completed: '#8B5CF6',
-    };
-
-    const statusLabels: any = {
-      pending: 'Pendente',
-      contacted: 'Contatado',
-      accepted: 'Aceito',
-      rejected: 'Recusado',
-      completed: 'Concluído',
-    };
-
-    return (
-      <View style={styles.leadCard}>
-        <View style={styles.leadHeader}>
-          <View>
-            <Text style={styles.leadClient}>{item.clientName}</Text>
-            <Text style={styles.leadDate}>
-              {new Date(item.createdAt).toLocaleDateString('pt-BR')}
-            </Text>
-          </View>
-          <View style={[styles.statusBadge, { backgroundColor: statusColors[item.status] }]}>
-            <Text style={styles.statusText}>{statusLabels[item.status]}</Text>
-          </View>
-        </View>
-
-        <Text style={styles.leadService}>{item.service?.title}</Text>
-        <Text style={styles.leadMessage} numberOfLines={2}>{item.message}</Text>
-
-        {item.budget && (
-          <Text style={styles.leadBudget}>Orçamento: R$ {Number(item.budget).toFixed(2)}</Text>
-        )}
-
-        <View style={styles.leadContact}>
-          <View style={styles.contactItem}>
-            <Ionicons name="mail" size={14} color="#94A3B8" />
-            <Text style={styles.contactText}>{item.clientEmail}</Text>
-          </View>
-          {item.clientPhone && (
-            <View style={styles.contactItem}>
-              <Ionicons name="logo-whatsapp" size={14} color="#10B981" />
-              <Text style={styles.contactText}>{item.clientPhone}</Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.leadActions}>
-          {item.status === 'pending' && (
-            <>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.acceptButton]}
-                onPress={() => handleUpdateStatus(item.id, 'contacted')}
-              >
-                <Text style={styles.actionButtonText}>Contatar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.rejectButton]}
-                onPress={() => handleUpdateStatus(item.id, 'rejected')}
-              >
-                <Text style={styles.actionButtonText}>Recusar</Text>
-              </TouchableOpacity>
-            </>
-          )}
-          {item.status === 'contacted' && (
-            <>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.acceptButton]}
-                onPress={() => handleUpdateStatus(item.id, 'accepted')}
-              >
-                <Text style={styles.actionButtonText}>Aceitar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.rejectButton]}
-                onPress={() => handleUpdateStatus(item.id, 'rejected')}
-              >
-                <Text style={styles.actionButtonText}>Recusar</Text>
-              </TouchableOpacity>
-            </>
-          )}
-          {item.status === 'accepted' && (
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.completeButton]}
-              onPress={() => handleUpdateStatus(item.id, 'completed')}
-            >
-              <Text style={styles.actionButtonText}>Marcar como Concluído</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    );
-  }
-
-  const filters = [
-    { key: 'all', label: 'Todos' },
-    { key: 'pending', label: 'Pendentes' },
-    { key: 'contacted', label: 'Contatados' },
-    { key: 'accepted', label: 'Aceitos' },
-    { key: 'completed', label: 'Concluídos' },
-  ];
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <StatusBar style="light" />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#F97316" />
-        </View>
-      </View>
-    );
-  }
+  const leads = useMemo(() => {
+    if (filter === 'all') return currentProviderLeads;
+    return currentProviderLeads.filter((lead) => lead.status === filter);
+  }, [currentProviderLeads, filter]);
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
-      
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Orçamentos</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      {stats && (
-        <View style={styles.statsContainer}>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{stats.total}</Text>
-            <Text style={styles.statLabel}>Total</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{stats.pending}</Text>
-            <Text style={styles.statLabel}>Pendentes</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{stats.accepted}</Text>
-            <Text style={styles.statLabel}>Aceitos</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: '#10B981' }]}>
-              R$ {stats.totalBudget.toFixed(0)}
-            </Text>
-            <Text style={styles.statLabel}>Orçamento Total</Text>
-          </View>
-        </View>
-      )}
-
-      <View style={styles.filtersContainer}>
-        <FlatList
-          horizontal
-          data={filters}
-          keyExtractor={(item) => item.key}
-          showsHorizontalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.filterButton, filter === item.key && styles.filterButtonActive]}
-              onPress={() => setFilter(item.key)}
-            >
-              <Text style={[styles.filterText, filter === item.key && styles.filterTextActive]}>
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
-      </View>
-
-      <FlatList
-        data={leads}
-        keyExtractor={(item) => item.id}
-        renderItem={renderLead}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F97316" />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="briefcase-outline" size={64} color="#64748B" />
-            <Text style={styles.emptyText}>Nenhum orçamento encontrado</Text>
-          </View>
-        }
+    <AppScreen scroll>
+      <ScreenHeader title="Leads" subtitle="Organize os briefings que entraram pelo app." onBack={() => navigation.goBack()} />
+      <SectionTitle
+        eyebrow="Pipeline"
+        title="Filtre por etapa"
+        description="Mantenha o acompanhamento comercial enxuto e visivel."
       />
-    </View>
+
+      <View style={styles.filters}>
+        {filters.map((item) => (
+          <FilterChip
+            key={item.value}
+            label={item.label}
+            active={filter === item.value}
+            onPress={() => setFilter(item.value)}
+          />
+        ))}
+      </View>
+
+      {leads.length === 0 ? (
+        <EmptyState
+          title="Sem leads nesta etapa"
+          description="Assim que clientes enviarem solicitacoes, elas aparecerao aqui com nome, contato e briefing."
+        />
+      ) : (
+        leads.map((lead) => (
+          <View key={lead.id} style={styles.card}>
+            <View style={styles.topRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.name}>{lead.clientName}</Text>
+                <Text style={styles.meta}>{formatLeadDate(lead.createdAt)} · {lead.location || 'local a definir'}</Text>
+              </View>
+              <Text style={styles.status}>{lead.status}</Text>
+            </View>
+
+            <Text style={styles.brief}>{lead.brief}</Text>
+
+            <View style={styles.infoBlock}>
+              <Text style={styles.infoLine}>{lead.clientPhone || lead.clientEmail || 'Sem contato informado'}</Text>
+              {lead.budget ? <Text style={styles.infoLine}>{lead.budget}</Text> : null}
+              {lead.eventDate ? <Text style={styles.infoLine}>Data: {lead.eventDate}</Text> : null}
+            </View>
+
+            <View style={styles.actions}>
+              {(['new', 'contacted', 'proposal', 'closed'] as LeadStatus[]).map((status) => (
+                <TouchableOpacity
+                  key={status}
+                  style={[styles.actionButton, lead.status === status && styles.actionButtonActive]}
+                  onPress={() => updateLeadStatus(lead.id, status)}
+                >
+                  <Text style={[styles.actionButtonText, lead.status === status && styles.actionButtonTextActive]}>{status}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ))
+      )}
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0F172A',
-  },
-  header: {
+  filters: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 18,
+  },
+  card: {
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 18,
+    marginBottom: 12,
+  },
+  topRow: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 16,
-    paddingTop: 50,
-    backgroundColor: '#1E293B',
-    borderBottomWidth: 1,
-    borderBottomColor: '#334155',
-  },
-  headerTitle: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    padding: 16,
     gap: 12,
   },
-  statBox: {
-    flex: 1,
-    backgroundColor: '#1E293B',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
+  name: {
+    color: colors.text,
+    fontWeight: '800',
+    fontSize: 18,
   },
-  statValue: {
-    color: '#F97316',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  statLabel: {
-    color: '#94A3B8',
-    fontSize: 11,
+  meta: {
+    color: colors.textSoft,
     marginTop: 4,
   },
-  filtersContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  status: {
+    color: colors.accentStrong,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    fontSize: 11,
   },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#1E293B',
-    marginRight: 8,
+  brief: {
+    marginTop: 14,
+    color: colors.textMuted,
+    lineHeight: 20,
   },
-  filterButtonActive: {
-    backgroundColor: '#F97316',
+  infoBlock: {
+    marginTop: 14,
+    gap: 4,
   },
-  filterText: {
-    color: '#94A3B8',
-    fontSize: 14,
-  },
-  filterTextActive: {
-    color: '#FFF',
-    fontWeight: 'bold',
-  },
-  listContent: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-  leadCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  leadHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  leadClient: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  leadDate: {
-    color: '#64748B',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    color: '#FFF',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  leadService: {
-    color: '#F97316',
-    fontSize: 14,
+  infoLine: {
+    color: colors.text,
     fontWeight: '600',
-    marginBottom: 8,
   },
-  leadMessage: {
-    color: '#94A3B8',
-    fontSize: 14,
-    marginBottom: 12,
-  },
-  leadBudget: {
-    color: '#10B981',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  leadContact: {
-    gap: 8,
-    marginBottom: 12,
-  },
-  contactItem: {
+  actions: {
+    marginTop: 18,
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
-  },
-  contactText: {
-    color: '#94A3B8',
-    fontSize: 13,
-  },
-  leadActions: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
   },
   actionButton: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 8,
-    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: colors.surfaceStrong,
   },
-  acceptButton: {
-    backgroundColor: '#10B981',
-  },
-  rejectButton: {
-    backgroundColor: '#EF4444',
-  },
-  completeButton: {
-    backgroundColor: '#8B5CF6',
+  actionButtonActive: {
+    backgroundColor: colors.accentStrong,
   },
   actionButtonText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: 'bold',
+    color: colors.textMuted,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    fontSize: 11,
+    letterSpacing: 0.5,
   },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    color: '#64748B',
-    fontSize: 16,
-    marginTop: 16,
+  actionButtonTextActive: {
+    color: colors.white,
   },
 });
+

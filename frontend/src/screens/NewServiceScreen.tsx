@@ -1,216 +1,330 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Platform, KeyboardAvoidingView } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import api from '../services/api';
-import * as ImagePicker from 'expo-image-picker';
-import { useAuth } from '../contexts/AuthContext';
+import { AppScreen } from '../components/common/AppScreen';
+import { FilterChip } from '../components/common/FilterChip';
+import { ScreenHeader } from '../components/common/ScreenHeader';
+import { useMarketplace } from '../contexts/MarketplaceContext';
+import { colors, shadows } from '../theme/tokens';
+import { pickImageFromDevice, pickVideoFromDevice } from '../utils/deviceMedia';
+import { parseList } from '../utils/format';
 
 export default function NewServiceScreen({ navigation }: any) {
-  const { token } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [location, setLocation] = useState('');
-  const [selectedVideo, setSelectedVideo] = useState<any>(null);
+  const { addProject, categories, signedIn } = useMarketplace();
+  const [form, setForm] = useState({
+    title: '',
+    category: '',
+    location: '',
+    year: String(new Date().getFullYear()),
+    summary: '',
+    deliverables: '',
+    tags: '',
+    clientName: '',
+    durationLabel: '',
+  });
+  const [coverUri, setCoverUri] = useState('');
+  const [videoUri, setVideoUri] = useState('');
+  const [videoLabel, setVideoLabel] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [pickerError, setPickerError] = useState('');
 
-  const CATEGORIES = [
-    'Eventos',
-    'Comércio',
-    'Empresas / Corporativo',
-    'Residencial',
-    'Obras / Construção',
-    'Educação',
-    'Produção Audiovisual',
-  ];
+  const categoryOptions = useMemo(
+    () => [...categories].sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [categories],
+  );
 
-  async function pickVideo() {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-      allowsEditing: true,
-      quality: 0.5,
-    });
+  const canSave = useMemo(
+    () => form.title.trim() && form.category.trim() && coverUri.trim() && form.summary.trim(),
+    [coverUri, form.category, form.summary, form.title],
+  );
 
-    if (!result.canceled) {
-      setSelectedVideo(result.assets[0]);
+  useEffect(() => {
+    if (!signedIn) {
+      navigation.replace('Login');
+    }
+  }, [navigation, signedIn]);
+
+  async function handlePickCover() {
+    setPickerError('');
+    try {
+      const asset = await pickImageFromDevice();
+      if (!asset) return;
+      setCoverUri(asset.uri);
+    } catch (error: any) {
+      setPickerError(error.message || 'Nao foi possivel selecionar a imagem.');
     }
   }
 
-  function toggleCategory(category: string) {
-    if (selectedCategories.includes(category)) {
-      setSelectedCategories(selectedCategories.filter(c => c !== category));
-    } else if (selectedCategories.length < 3) {
-      setSelectedCategories([...selectedCategories, category]);
-    } else {
-      Alert.alert('Limite atingido', 'Você pode selecionar no máximo 3 categorias');
+  async function handlePickVideo() {
+    setPickerError('');
+    try {
+      const asset = await pickVideoFromDevice();
+      if (!asset) return;
+      setVideoUri(asset.uri);
+      setVideoLabel(asset.fileName || 'Video selecionado do dispositivo');
+    } catch (error: any) {
+      setPickerError(error.message || 'Nao foi possivel selecionar o video.');
     }
   }
 
   async function handlePublish() {
-    if (!token) return Alert.alert('Erro', 'Você precisa estar logado');
-    if (!title || !price || !location || !selectedVideo || selectedCategories.length === 0) {
-      return Alert.alert('Atenção', 'Preencha todos os campos, selecione pelo menos 1 categoria e um vídeo.');
-    }
-
-    setLoading(true);
-
-    try {
-      const data = new FormData();
-      data.append('title', title);
-      data.append('description', description);
-      data.append('price', price.replace(',', '.'));
-      data.append('categories', JSON.stringify(selectedCategories));
-      data.append('location', location);
-      data.append('coverUrl', `https://source.unsplash.com/800x600/?${selectedCategories[0].toLowerCase()},video`);
-
-      let filename = selectedVideo.uri.split('/').pop();
-      if (!filename) filename = `video_${Date.now()}.mp4`;
-
-      if (Platform.OS === 'web') {
-        const videoResponse = await fetch(selectedVideo.uri);
-        const videoBlob = await videoResponse.blob();
-        data.append('video', videoBlob, filename);
-      } else {
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `video/${match[1]}` : `video/mp4`;
-        data.append('video', { uri: selectedVideo.uri, name: filename, type } as any);
-      }
-
-      const response = await fetch(`${api.defaults.baseURL}/services`, { 
-        method: 'POST',
-        body: data,
-        headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` },
-      });
-
-      const responseJson = await response.json();
-
-      if (response.ok) {
-        Alert.alert('Sucesso! 🚀', 'Anúncio publicado!', [
-            { text: 'OK', onPress: () => navigation.navigate('Início') },
-        ]);
-      } else {
-        throw new Error(JSON.stringify(responseJson));
-      }
-    } catch (error: any) {
-      Alert.alert('Erro', error.message || 'Falha ao enviar vídeo');
-    } finally {
-      setLoading(false);
-    }
+    if (!canSave) return;
+    setSaving(true);
+    await addProject({
+      title: form.title,
+      category: form.category,
+      location: form.location,
+      year: form.year,
+      coverUrl: coverUri,
+      videoUrl: videoUri || undefined,
+      summary: form.summary,
+      deliverables: parseList(form.deliverables),
+      tags: parseList(form.tags),
+      clientName: form.clientName,
+      durationLabel: form.durationLabel,
+    });
+    setSaving(false);
+    navigation.goBack();
   }
 
+  if (!signedIn) return null;
+
   return (
-    <KeyboardAvoidingView 
-      style={{ flex: 1 }} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={styles.container}>
-        <StatusBar style="light" />
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Novo Anúncio</Text>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="close" size={24} color="#FFF" />
-          </TouchableOpacity>
-        </View>
+    <AppScreen scroll>
+      <ScreenHeader title="Novo projeto" subtitle="Suba capa e video direto do dispositivo." onBack={() => navigation.goBack()} />
 
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        <Text style={styles.label}>TÍTULO</Text>
-        <TextInput style={styles.input} placeholder="Ex: Comercial para TV" placeholderTextColor="#64748B" value={title} onChangeText={setTitle} />
+      <View style={styles.card}>
+        <Text style={styles.label}>Titulo do projeto</Text>
+        <TextInput
+          style={styles.input}
+          value={form.title}
+          onChangeText={(title) => setForm((current) => ({ ...current, title }))}
+          placeholder="Ex: Fashion film de colecao"
+          placeholderTextColor={colors.textSoft}
+        />
 
-        <Text style={styles.label}>VÍDEO DO SERVIÇO</Text>
-        <TouchableOpacity style={styles.uploadButton} onPress={pickVideo}>
-          {selectedVideo ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Ionicons name="checkmark-circle" size={24} color="#25D366" />
-              <Text style={[styles.uploadText, { color: '#25D366', marginLeft: 10 }]}>Vídeo Selecionado</Text>
-            </View>
+        <Text style={styles.label}>Categoria</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroller}>
+          <View style={styles.categoryRow}>
+            {categoryOptions.map((item) => (
+              <FilterChip
+                key={item}
+                label={item}
+                active={form.category === item}
+                onPress={() => setForm((current) => ({ ...current, category: item }))}
+              />
+            ))}
+          </View>
+        </ScrollView>
+
+        <Text style={styles.label}>Cidade</Text>
+        <TextInput
+          style={styles.input}
+          value={form.location}
+          onChangeText={(location) => setForm((current) => ({ ...current, location }))}
+          placeholder="Ex: Sao Paulo, SP"
+          placeholderTextColor={colors.textSoft}
+        />
+
+        <Text style={styles.label}>Ano</Text>
+        <TextInput
+          style={styles.input}
+          value={form.year}
+          onChangeText={(year) => setForm((current) => ({ ...current, year }))}
+          placeholder="2026"
+          placeholderTextColor={colors.textSoft}
+          keyboardType="numeric"
+        />
+
+        <Text style={styles.label}>Capa do projeto</Text>
+        <TouchableOpacity style={styles.uploadCard} onPress={handlePickCover} activeOpacity={0.9}>
+          {coverUri ? (
+            <Image source={{ uri: coverUri }} style={styles.uploadPreview} />
           ) : (
-            <>
-              <Ionicons name="cloud-upload-outline" size={30} color="#F97316" />
-              <Text style={styles.uploadText}>Toque para selecionar um vídeo</Text>
-            </>
+            <View style={styles.uploadPlaceholder}>
+              <Ionicons name="image-outline" size={28} color={colors.accentStrong} />
+              <Text style={styles.uploadTitle}>Escolher imagem do dispositivo</Text>
+              <Text style={styles.uploadText}>Nada de URL. A capa sai direto da galeria do aparelho.</Text>
+            </View>
           )}
         </TouchableOpacity>
 
-        <Text style={styles.label}>PREÇO (R$)</Text>
-        <TextInput style={styles.input} placeholder="0,00" keyboardType="numeric" placeholderTextColor="#64748B" value={price} onChangeText={setPrice} />
-
-        <Text style={styles.label}>CATEGORIAS (Escolha até 3)</Text>
-        <View style={styles.categoriesGrid}>
-          {CATEGORIES.map((cat) => (
-            <TouchableOpacity
-              key={cat}
-              style={[
-                styles.categoryChip,
-                selectedCategories.includes(cat) && styles.categoryChipActive
-              ]}
-              onPress={() => toggleCategory(cat)}
-            >
-              <Text style={[
-                styles.categoryChipText,
-                selectedCategories.includes(cat) && styles.categoryChipTextActive
-              ]}>
-                {cat}
-              </Text>
-              {selectedCategories.includes(cat) && (
-                <Ionicons name="checkmark-circle" size={16} color="#FFF" style={{ marginLeft: 6 }} />
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={styles.label}>LOCALIZAÇÃO</Text>
-        <TextInput style={styles.input} placeholder="Cidade - UF" placeholderTextColor="#64748B" value={location} onChangeText={setLocation} />
-
-        <Text style={styles.label}>DESCRIÇÃO</Text>
-        <TextInput style={[styles.input, { height: 80 }]} multiline placeholder="Detalhes..." placeholderTextColor="#64748B" value={description} onChangeText={setDescription} />
-
-        <TouchableOpacity style={styles.publishButton} onPress={handlePublish} disabled={loading}>
-          {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.publishText}>PUBLICAR VÍDEO</Text>}
+        <Text style={styles.label}>Video do projeto</Text>
+        <TouchableOpacity style={styles.uploadInlineCard} onPress={handlePickVideo} activeOpacity={0.9}>
+          <Ionicons name="videocam-outline" size={24} color={colors.accentStrong} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.uploadInlineTitle}>Selecionar video do dispositivo</Text>
+            <Text style={styles.uploadInlineText}>{videoLabel || 'Opcional, mas ajuda a deixar o case mais completo.'}</Text>
+          </View>
         </TouchableOpacity>
-      </ScrollView>
-    </View>
-    </KeyboardAvoidingView>
+
+        {pickerError ? <Text style={styles.errorText}>{pickerError}</Text> : null}
+
+        <Text style={styles.label}>Cliente</Text>
+        <TextInput
+          style={styles.input}
+          value={form.clientName}
+          onChangeText={(clientName) => setForm((current) => ({ ...current, clientName }))}
+          placeholder="Marca, casal ou empresa"
+          placeholderTextColor={colors.textSoft}
+        />
+
+        <Text style={styles.label}>Prazo de entrega</Text>
+        <TextInput
+          style={styles.input}
+          value={form.durationLabel}
+          onChangeText={(durationLabel) => setForm((current) => ({ ...current, durationLabel }))}
+          placeholder="Ex: entrega em 7 dias"
+          placeholderTextColor={colors.textSoft}
+        />
+
+        <Text style={styles.label}>Entregaveis</Text>
+        <TextInput
+          style={styles.input}
+          value={form.deliverables}
+          onChangeText={(deliverables) => setForm((current) => ({ ...current, deliverables }))}
+          placeholder="Separe por virgula"
+          placeholderTextColor={colors.textSoft}
+        />
+
+        <Text style={styles.label}>Tags</Text>
+        <TextInput
+          style={styles.input}
+          value={form.tags}
+          onChangeText={(tags) => setForm((current) => ({ ...current, tags }))}
+          placeholder="Separe por virgula"
+          placeholderTextColor={colors.textSoft}
+        />
+
+        <Text style={styles.label}>Resumo do projeto</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          value={form.summary}
+          onChangeText={(summary) => setForm((current) => ({ ...current, summary }))}
+          multiline
+          numberOfLines={7}
+          textAlignVertical="top"
+          placeholder="Conte o contexto, a direcao e o que foi entregue."
+          placeholderTextColor={colors.textSoft}
+        />
+      </View>
+
+      <TouchableOpacity style={[styles.button, !canSave && styles.buttonDisabled]} onPress={handlePublish} disabled={!canSave || saving}>
+        <Text style={styles.buttonText}>{saving ? 'Publicando...' : 'Publicar projeto'}</Text>
+      </TouchableOpacity>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F172A', padding: 20, paddingTop: 50 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#F8FAFC' },
-  label: { color: '#94A3B8', fontSize: 12, fontWeight: 'bold', marginBottom: 8, marginTop: 15 },
-  input: { backgroundColor: '#1E293B', color: '#FFF', padding: 15, borderRadius: 12, borderWidth: 1, borderColor: '#334155', fontSize: 16 },
-  uploadButton: { backgroundColor: '#1E293B', height: 100, borderRadius: 12, borderWidth: 2, borderColor: '#334155', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
-  uploadText: { color: '#94A3B8', marginTop: 10, fontWeight: 'bold' },
-  categoriesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 10,
+  card: {
+    borderRadius: 28,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 18,
+    ...shadows.card,
   },
-  categoryChip: {
+  label: {
+    color: colors.text,
+    fontWeight: '800',
+    marginBottom: 8,
+    marginTop: 14,
+    fontSize: 13,
+  },
+  input: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    color: colors.text,
+  },
+  categoryScroller: {
+    marginBottom: 2,
+  },
+  categoryRow: {
     flexDirection: 'row',
+    gap: 10,
+    paddingBottom: 4,
+  },
+  uploadCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    overflow: 'hidden',
+  },
+  uploadPreview: {
+    width: '100%',
+    height: 220,
+  },
+  uploadPlaceholder: {
+    paddingHorizontal: 18,
+    paddingVertical: 28,
     alignItems: 'center',
-    backgroundColor: '#1E293B',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+  },
+  uploadTitle: {
+    marginTop: 12,
+    color: colors.text,
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  uploadText: {
+    marginTop: 8,
+    color: colors.textMuted,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  uploadInlineCard: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    padding: 16,
+    flexDirection: 'row',
+    gap: 14,
+    alignItems: 'center',
   },
-  categoryChipActive: {
-    backgroundColor: '#F97316',
-    borderColor: '#F97316',
+  uploadInlineTitle: {
+    color: colors.text,
+    fontWeight: '800',
   },
-  categoryChipText: {
-    color: '#94A3B8',
-    fontSize: 13,
-    fontWeight: '600',
+  uploadInlineText: {
+    marginTop: 4,
+    color: colors.textMuted,
+    lineHeight: 18,
   },
-  categoryChipTextActive: {
-    color: '#FFF',
+  errorText: {
+    marginTop: 10,
+    color: colors.danger,
+    fontWeight: '700',
   },
-  publishButton: { backgroundColor: '#F97316', padding: 18, borderRadius: 12, alignItems: 'center', marginTop: 30 },
-  publishText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
+  textArea: {
+    minHeight: 160,
+  },
+  button: {
+    marginTop: 20,
+    marginBottom: 28,
+    borderRadius: 18,
+    backgroundColor: colors.accentStrong,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.4,
+  },
+  buttonText: {
+    color: colors.white,
+    fontWeight: '800',
+  },
 });

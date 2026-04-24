@@ -1,325 +1,119 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { StatusBar } from 'expo-status-bar';
+﻿import React, { useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AppScreen } from '../components/common/AppScreen';
+import { ScreenHeader } from '../components/common/ScreenHeader';
+import { useMarketplace } from '../contexts/MarketplaceContext';
+import { colors, shadows } from '../theme/tokens';
 
 export default function PremiumUpgradeScreen({ navigation }: any) {
-  const features = [
-    {
-      icon: 'diamond',
-      title: 'Badge Premium',
-      description: 'Destaque visual em todos os seus serviços',
-      color: '#F97316',
-    },
-    {
-      icon: 'trending-up',
-      title: 'Prioridade nos Resultados',
-      description: 'Apareça no topo das buscas',
-      color: '#10B981',
-    },
-    {
-      icon: 'analytics',
-      title: 'Analytics Profissional',
-      description: 'Gráficos de desempenho e métricas detalhadas',
-      color: '#3B82F6',
-    },
-    {
-      icon: 'briefcase',
-      title: 'Sistema de Orçamentos',
-      description: 'Receba solicitações direto pelo app',
-      color: '#8B5CF6',
-    },
-    {
-      icon: 'push',
-      title: 'Pin de Serviços',
-      description: 'Fixe até 3 serviços no topo do seu perfil',
-      color: '#F59E0B',
-    },
-    {
-      icon: 'infinite',
-      title: 'Serviços Ilimitados',
-      description: 'Publique quantos serviços quiser',
-      color: '#EF4444',
-    },
-  ];
+  const { currentProvider, upgradeCurrentProviderToPro, signedIn } = useMarketplace();
+  const [loading, setLoading] = useState(false);
+
+  async function handleUpgrade() {
+    setLoading(true);
+    await upgradeCurrentProviderToPro();
+    setLoading(false);
+    navigation.goBack();
+  }
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
-      
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="close" size={28} color="#FFF" />
-        </TouchableOpacity>
-        <Ionicons name="diamond" size={28} color="#F97316" />
+    <AppScreen scroll>
+      <ScreenHeader title="Studio Pro" subtitle="Mais destaque para quem quer usar o app como canal real de venda." onBack={() => navigation.goBack()} />
+
+      <View style={styles.heroCard}>
+        <Text style={styles.planLabel}>Plano destaque</Text>
+        <Text style={styles.planTitle}>Seu portfolio aparece com mais presenca e contexto comercial.</Text>
+        <Text style={styles.planText}>Pensado para videomakers que querem transformar o catalogo em um funil mais forte de descoberta e briefing qualificado.</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.hero}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="diamond" size={64} color="#F97316" />
-          </View>
-          <Text style={styles.title}>Torne-se Premium</Text>
-          <Text style={styles.subtitle}>
-            Potencialize seus resultados e receba 4x mais orçamentos
-          </Text>
+      {[
+        'Selo Studio Pro no perfil e nos cards do catalogo.',
+        'Posicionamento prioritario em areas de curadoria do app.',
+        'Mais espaco para apresentar portfolio, entregas e proposta.',
+      ].map((item) => (
+        <View key={item} style={styles.featureCard}>
+          <Text style={styles.featureText}>{item}</Text>
         </View>
+      ))}
 
-        <View style={styles.pricing}>
-          <View style={styles.priceBox}>
-            <Text style={styles.priceLabel}>Por apenas</Text>
-            <View style={styles.priceRow}>
-              <Text style={styles.currency}>R$</Text>
-              <Text style={styles.price}>39</Text>
-              <View>
-                <Text style={styles.cents}>,90</Text>
-                <Text style={styles.period}>/mês</Text>
-              </View>
-            </View>
-            <Text style={styles.savings}>Economize R$ 180 em custos de marketing</Text>
-          </View>
+      {signedIn && currentProvider && !currentProvider.isPro ? (
+        <TouchableOpacity style={styles.button} onPress={handleUpgrade} disabled={loading}>
+          <Text style={styles.buttonText}>{loading ? 'Ativando...' : 'Ativar Studio Pro no demo'}</Text>
+        </TouchableOpacity>
+      ) : signedIn && currentProvider?.isPro ? (
+        <View style={styles.activeCard}>
+          <Text style={styles.activeTitle}>Seu perfil ja esta com Studio Pro ativo.</Text>
         </View>
-
-        <View style={styles.features}>
-          <Text style={styles.featuresTitle}>O que você ganha:</Text>
-          {features.map((feature, index) => (
-            <View key={index} style={styles.featureItem}>
-              <View style={[styles.featureIcon, { backgroundColor: feature.color + '20' }]}>
-                <Ionicons name={feature.icon as any} size={24} color={feature.color} />
-              </View>
-              <View style={styles.featureText}>
-                <Text style={styles.featureTitle}>{feature.title}</Text>
-                <Text style={styles.featureDescription}>{feature.description}</Text>
-              </View>
-              <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.stats}>
-          <Text style={styles.statsTitle}>Resultados Comprovados:</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>4x</Text>
-              <Text style={styles.statLabel}>Mais Orçamentos</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>60%</Text>
-              <Text style={styles.statLabel}>Mais Visualizações</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>85%</Text>
-              <Text style={styles.statLabel}>Taxa de Satisfação</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.cta}>
-          <TouchableOpacity style={styles.subscribeButton}>
-            <Ionicons name="diamond" size={24} color="#FFF" />
-            <Text style={styles.subscribeButtonText}>Assinar Premium Agora</Text>
-          </TouchableOpacity>
-          <Text style={styles.disclaimer}>
-            Cancele quando quiser. Sem taxas adicionais.
-          </Text>
-        </View>
-      </ScrollView>
-    </View>
+      ) : (
+        <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Login')}>
+          <Text style={styles.buttonText}>Entrar para ativar o plano</Text>
+        </TouchableOpacity>
+      )}
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0F172A',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    paddingTop: 50,
-    backgroundColor: '#1E293B',
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 100,
-  },
-  hero: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  iconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(249, 115, 22, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    color: '#FFF',
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  subtitle: {
-    color: '#94A3B8',
-    fontSize: 16,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  pricing: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  priceBox: {
-    backgroundColor: '#1E293B',
-    borderRadius: 20,
+  heroCard: {
+    borderRadius: 30,
     padding: 24,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#F97316',
-    width: '100%',
+    backgroundColor: colors.goldSoft,
+    ...shadows.card,
   },
-  priceLabel: {
-    color: '#94A3B8',
-    fontSize: 14,
-    marginBottom: 8,
+  planLabel: {
+    color: colors.gold,
+    textTransform: 'uppercase',
+    fontWeight: '900',
+    fontSize: 11,
+    letterSpacing: 1.2,
   },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+  planTitle: {
+    marginTop: 10,
+    color: colors.text,
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: '800',
   },
-  currency: {
-    color: '#FFF',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginTop: 8,
+  planText: {
+    marginTop: 10,
+    color: colors.textMuted,
+    lineHeight: 21,
   },
-  price: {
-    color: '#F97316',
-    fontSize: 64,
-    fontWeight: 'bold',
-    lineHeight: 64,
-  },
-  cents: {
-    color: '#F97316',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  period: {
-    color: '#94A3B8',
-    fontSize: 14,
-  },
-  savings: {
-    color: '#10B981',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  features: {
-    marginBottom: 32,
-  },
-  featuresTitle: {
-    color: '#FFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#1E293B',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+  featureCard: {
+    marginTop: 12,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#334155',
-  },
-  featureIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: colors.border,
+    padding: 18,
   },
   featureText: {
-    flex: 1,
+    color: colors.text,
+    lineHeight: 20,
+    fontWeight: '700',
   },
-  featureTitle: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  featureDescription: {
-    color: '#94A3B8',
-    fontSize: 13,
-  },
-  stats: {
-    marginBottom: 32,
-  },
-  statsTitle: {
-    color: '#FFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  statValue: {
-    color: '#F97316',
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  statLabel: {
-    color: '#94A3B8',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  cta: {
+  button: {
+    marginTop: 22,
+    borderRadius: 18,
+    backgroundColor: colors.accentStrong,
+    paddingVertical: 16,
     alignItems: 'center',
   },
-  subscribeButton: {
-    flexDirection: 'row',
+  buttonText: {
+    color: colors.white,
+    fontWeight: '800',
+  },
+  activeCard: {
+    marginTop: 22,
+    borderRadius: 18,
+    backgroundColor: colors.successSoft,
+    padding: 18,
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    backgroundColor: '#F97316',
-    paddingVertical: 18,
-    paddingHorizontal: 32,
-    borderRadius: 30,
-    width: '100%',
-    marginBottom: 12,
-    elevation: 8,
-    shadowColor: '#F97316',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
   },
-  subscribeButtonText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  disclaimer: {
-    color: '#64748B',
-    fontSize: 12,
-    textAlign: 'center',
+  activeTitle: {
+    color: colors.success,
+    fontWeight: '800',
   },
 });
+
+
