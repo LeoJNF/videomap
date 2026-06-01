@@ -18,4 +18,5 @@ export type RootStackParamList = {
   LeadsManagement: undefined;
   AnalyticsDashboard: undefined;
   PremiumUpgrade: undefined;
+  Suggestions: undefined;
 };

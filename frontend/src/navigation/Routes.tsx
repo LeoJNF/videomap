@@ -22,6 +22,7 @@ import LeadFormScreen from '../screens/LeadFormScreen';
 import LeadsManagementScreen from '../screens/LeadsManagementScreen';
 import AnalyticsDashboardScreen from '../screens/AnalyticsDashboardScreen';
 import PremiumUpgradeScreen from '../screens/PremiumUpgradeScreen';
+import SuggestionsScreen from '../screens/SuggestionsScreen';
 import { useMarketplace } from '../contexts/MarketplaceContext';
 import { colors } from '../theme/tokens';
 import { MainTabParamList, RootStackParamList } from './types';
@@ -82,7 +83,7 @@ function TabNavigator() {
       <Tab.Screen
         name="Studio"
         component={AccountScreen}
-        options={{ title: 'Studio' }}
+        options={{ title: 'Area Pro' }}
       />
     </Tab.Navigator>
   );
@@ -94,7 +95,7 @@ function LoadingScreen() {
       <Text style={styles.loadingBrand}>VIDEOMAP</Text>
       <Text style={styles.loadingTitle}>Montando a experiencia do catalogo</Text>
       <Text style={styles.loadingText}>
-        Carregando portfolios, favoritos e a area profissional do videomaker.
+        Carregando trabalhos, favoritos e a area profissional do videomaker.
       </Text>
     </View>
   );
@@ -143,6 +144,7 @@ export default function Routes() {
         <Stack.Screen name="LeadsManagement" component={LeadsManagementScreen} />
         <Stack.Screen name="AnalyticsDashboard" component={AnalyticsDashboardScreen} />
         <Stack.Screen name="PremiumUpgrade" component={PremiumUpgradeScreen} />
+        <Stack.Screen name="Suggestions" component={SuggestionsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -19,6 +19,23 @@ export interface ProviderMetrics {
   portfolioViews: number;
 }
 
+export interface ProjectComment {
+  id: string;
+  projectId: string;
+  authorName: string;
+  message: string;
+  createdAt: string;
+}
+
+export interface ImprovementSuggestion {
+  id: string;
+  providerId: string;
+  title: string;
+  message: string;
+  createdAt: string;
+  category: 'produto' | 'pagamento' | 'notificacao' | 'outro';
+}
+
 export interface PortfolioProject {
   id: string;
   providerId: string;
@@ -115,4 +132,6 @@ export interface MarketplaceState {
   providers: ProviderProfile[];
   favoriteProviderIds: string[];
   leads: LeadRequest[];
+  comments: ProjectComment[];
+  suggestions: ImprovementSuggestion[];
 }

@@ -27,10 +27,10 @@ export default function LoginScreen({ navigation }: any) {
 
   return (
     <AppScreen scroll>
-      <ScreenHeader title="Entrar" subtitle="Acesso do videomaker ao studio." onBack={() => navigation.goBack()} />
+      <ScreenHeader title="Entrar" subtitle="Acesso do videomaker a area profissional." onBack={() => navigation.goBack()} />
       <View style={styles.card}>
         <Text style={styles.eyebrow}>Acesso profissional</Text>
-        <Text style={styles.title}>Entre para editar perfil, publicar portfolio e responder leads.</Text>
+        <Text style={styles.title}>Entre para editar perfil, publicar trabalhos e responder propostas.</Text>
         <Text style={styles.helper}>Demo pronta para testar: videomaker@videomap.local / 123456</Text>
 
         <Text style={styles.label}>Email</Text>
@@ -40,7 +40,7 @@ export default function LoginScreen({ navigation }: any) {
           onChangeText={setEmail}
           autoCapitalize="none"
           keyboardType="email-address"
-          placeholder="voce@studio.com"
+          placeholder="voce@perfil.com"
           placeholderTextColor={colors.textSoft}
         />
 
@@ -57,7 +57,7 @@ export default function LoginScreen({ navigation }: any) {
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <TouchableOpacity style={styles.primaryButton} onPress={handleLogin} disabled={loading}>
-          <Text style={styles.primaryButtonText}>{loading ? 'Entrando...' : 'Entrar no studio'}</Text>
+          <Text style={styles.primaryButtonText}>{loading ? 'Entrando...' : 'Entrar na area pro'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('SignUp')}>

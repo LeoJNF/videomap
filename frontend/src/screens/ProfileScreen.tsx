@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Linking,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { AppScreen } from '../components/common/AppScreen';
 import { EmptyState } from '../components/common/EmptyState';
@@ -16,7 +17,7 @@ import { SectionTitle } from '../components/common/SectionTitle';
 import { FilterChip } from '../components/common/FilterChip';
 import { useMarketplace } from '../contexts/MarketplaceContext';
 import { colors, shadows } from '../theme/tokens';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatExperienceLevelLabel } from '../utils/format';
 
 function levelBadgeStyle(level: string) {
   if (level === 'PRO') {
@@ -73,13 +74,11 @@ export default function ProfileScreen({ route, navigation }: any) {
   const categoryTabs = useMemo(() => {
     if (!provider) return ['Todos'];
 
-    const orderedTags = [
-      ...provider.specialties,
-      ...projects.map((project) => project.category),
-    ];
+    const orderedTags = [...provider.specialties, ...projects.map((project) => project.category)];
 
     return ['Todos', ...Array.from(new Set(orderedTags))];
   }, [projects, provider]);
+
   const filteredProjects = useMemo(() => {
     if (selectedCategory === 'Todos') return projects;
     return projects.filter((project) => project.category === selectedCategory);
@@ -97,7 +96,7 @@ export default function ProfileScreen({ route, navigation }: any) {
         <ScreenHeader title="Videomaker" onBack={() => navigation.goBack()} />
         <EmptyState
           title="Perfil nao encontrado"
-          description="Esse videomaker pode ter sido removido ou ainda nao publicou portfolio."
+          description="Esse videomaker pode ter sido removido ou ainda nao publicou trabalhos."
         />
       </AppScreen>
     );
@@ -108,8 +107,8 @@ export default function ProfileScreen({ route, navigation }: any) {
   const levelBadge = levelBadgeStyle(provider.experienceLevel);
 
   const statItems = [
-    { label: 'posts', value: String(projects.length) },
-    { label: 'jobs', value: String(provider.completedProjects) },
+    { label: 'projetos', value: String(projects.length) },
+    { label: 'trabalhos', value: String(provider.completedProjects) },
     { label: 'avaliacao', value: `${provider.satisfactionRate}%` },
   ];
 
@@ -165,7 +164,9 @@ export default function ProfileScreen({ route, navigation }: any) {
         <View style={styles.nameRow}>
           <Text style={styles.displayName}>{provider.name}</Text>
           <View style={[styles.levelBadge, levelBadge.container]}>
-            <Text style={[styles.levelText, levelBadge.text]}>{provider.experienceLevel}</Text>
+            <Text style={[styles.levelText, levelBadge.text]}>
+              {formatExperienceLevelLabel(provider.experienceLevel)}
+            </Text>
           </View>
         </View>
         <Text style={styles.headline}>{provider.headline}</Text>
@@ -213,10 +214,7 @@ export default function ProfileScreen({ route, navigation }: any) {
         </View>
       </View>
 
-      <SectionTitle
-        eyebrow="Portfolio"
-        title="Projetos"
-      />
+      <SectionTitle eyebrow="Trabalhos" title="Projetos" />
 
       {categoryTabs.length > 1 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroller}>
@@ -247,47 +245,64 @@ export default function ProfileScreen({ route, navigation }: any) {
           </Text>
         </View>
       ) : (
-        <View style={styles.projectGrid}>
-          {filteredProjects.map((project, index) => (
+        <View style={styles.projectList}>
+          {filteredProjects.map((project) => (
             <TouchableOpacity
               key={project.id}
-              style={styles.projectTile}
+              style={styles.projectCard}
               onPress={() =>
                 navigation.navigate('Details', {
                   providerId: provider.id,
                   projectId: project.id,
                 })
               }
-              activeOpacity={0.9}
+              activeOpacity={0.92}
             >
-              <Image source={{ uri: project.coverUrl }} style={styles.projectImage} />
-              <View style={styles.projectTopBadges}>
+              <View style={styles.projectMediaWrap}>
                 {project.videoUrl ? (
-                  <View style={styles.projectIconBadge}>
-                    <Ionicons name="play" size={12} color={colors.white} />
-                  </View>
-                ) : null}
-                {project.featured || index === 0 ? (
-                  <View style={styles.projectIconBadge}>
-                    <Ionicons name="sparkles" size={12} color={colors.white} />
-                  </View>
-                ) : null}
+                  <Video
+                    style={styles.projectMedia}
+                    source={{ uri: project.videoUrl }}
+                    resizeMode={ResizeMode.COVER}
+                    useNativeControls
+                    shouldPlay={false}
+                  />
+                ) : (
+                  <Image source={{ uri: project.coverUrl }} style={styles.projectMedia} />
+                )}
+
+                <View style={styles.projectTopBadges}>
+                  {project.videoUrl ? (
+                    <View style={styles.projectIconBadge}>
+                      <Ionicons name="play" size={12} color={colors.white} />
+                    </View>
+                  ) : null}
+                  {project.featured ? (
+                    <View style={styles.projectIconBadge}>
+                      <Ionicons name="sparkles" size={12} color={colors.white} />
+                    </View>
+                  ) : null}
+                </View>
               </View>
-              <View style={styles.projectOverlay}>
-                <Text style={styles.projectTitle} numberOfLines={2}>
-                  {project.title}
+
+              <View style={styles.projectContent}>
+                <View style={styles.projectMetaRow}>
+                  <View style={styles.projectCategoryBadge}>
+                    <Text style={styles.projectCategoryText}>{project.category}</Text>
+                  </View>
+                  <Text style={styles.projectLocationText}>{project.location}</Text>
+                </View>
+                <Text style={styles.projectTitle}>{project.title}</Text>
+                <Text style={styles.projectSummary} numberOfLines={2}>
+                  {project.summary}
                 </Text>
-                <Text style={styles.projectMeta}>{project.category}</Text>
               </View>
             </TouchableOpacity>
           ))}
         </View>
       )}
 
-      <SectionTitle
-        eyebrow="Contato"
-        title="Contato"
-      />
+      <SectionTitle eyebrow="Contato" title="Contato" />
 
       <View style={styles.contactCard}>
         <View style={styles.contactRow}>
@@ -511,60 +526,80 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     lineHeight: 20,
   },
-  projectGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 10,
+  projectList: {
+    gap: 14,
     marginBottom: 24,
   },
-  projectTile: {
-    width: '31.7%',
-    aspectRatio: 1,
-    borderRadius: 18,
+  projectCard: {
+    borderRadius: 24,
     overflow: 'hidden',
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  projectMediaWrap: {
     position: 'relative',
   },
-  projectImage: {
+  projectMedia: {
     width: '100%',
-    height: '100%',
+    height: 280,
+    backgroundColor: colors.surfaceDark,
   },
   projectTopBadges: {
     position: 'absolute',
-    top: 8,
-    left: 8,
-    right: 8,
+    top: 12,
+    left: 12,
+    right: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   projectIconBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.58)',
   },
-  projectOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    padding: 10,
-    backgroundColor: 'rgba(0,0,0,0.58)',
+  projectContent: {
+    padding: 16,
+  },
+  projectMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  projectCategoryBadge: {
+    borderRadius: 999,
+    backgroundColor: colors.accentSoft,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  projectCategoryText: {
+    color: colors.accentStrong,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  projectLocationText: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '700',
   },
   projectTitle: {
+    marginTop: 12,
     color: colors.white,
-    fontSize: 11,
+    fontSize: 21,
+    lineHeight: 26,
     fontWeight: '800',
-    lineHeight: 14,
   },
-  projectMeta: {
-    marginTop: 3,
-    color: 'rgba(255,255,255,0.74)',
-    fontSize: 10,
-    fontWeight: '700',
+  projectSummary: {
+    marginTop: 8,
+    color: colors.textMuted,
+    lineHeight: 20,
   },
   contactCard: {
     borderRadius: 24,

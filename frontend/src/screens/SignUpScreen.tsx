@@ -6,9 +6,9 @@ import { ScreenHeader } from '../components/common/ScreenHeader';
 import { useMarketplace } from '../contexts/MarketplaceContext';
 import { colors, shadows } from '../theme/tokens';
 import { experienceLevels, ExperienceLevel } from '../types/marketplace';
-import { parseList } from '../utils/format';
+import { formatExperienceLevelLabel, parseList } from '../utils/format';
 
-const defaultSpecialties = ['Casamentos', 'Brand Content', 'Eventos Corporativos', 'Fashion Films', 'Documentarios'];
+const defaultSpecialties = ['Casamentos', 'Conteudo para marcas', 'Eventos Corporativos', 'Filmes de moda', 'Documentarios'];
 
 export default function SignUpScreen({ navigation }: any) {
   const { registerProvider } = useMarketplace();
@@ -62,15 +62,15 @@ export default function SignUpScreen({ navigation }: any) {
     <AppScreen scroll>
       <ScreenHeader title="Criar perfil" subtitle="Cadastro do videomaker, nao do cliente." onBack={() => navigation.goBack()} />
       <View style={styles.card}>
-        <Text style={styles.eyebrow}>Novo studio</Text>
+        <Text style={styles.eyebrow}>Novo perfil</Text>
         <Text style={styles.title}>Monte um perfil profissional pronto para ser encontrado por clientes.</Text>
 
-        <Text style={styles.label}>Nome do studio ou videomaker</Text>
+        <Text style={styles.label}>Nome do perfil ou videomaker</Text>
         <TextInput
           style={styles.input}
           value={form.name}
           onChangeText={(name) => setForm((current) => ({ ...current, name }))}
-          placeholder="Ex: Marina Rocha Films"
+          placeholder="Ex: Marina Rocha Videos"
           placeholderTextColor={colors.textSoft}
         />
 
@@ -81,7 +81,7 @@ export default function SignUpScreen({ navigation }: any) {
           onChangeText={(email) => setForm((current) => ({ ...current, email }))}
           autoCapitalize="none"
           keyboardType="email-address"
-          placeholder="voce@studio.com"
+          placeholder="voce@perfil.com"
           placeholderTextColor={colors.textSoft}
         />
 
@@ -109,7 +109,7 @@ export default function SignUpScreen({ navigation }: any) {
           {experienceLevels.map((item) => (
             <FilterChip
               key={item}
-              label={item}
+              label={formatExperienceLevelLabel(item)}
               active={form.experienceLevel === item}
               onPress={() =>
                 setForm((current) => ({ ...current, experienceLevel: item }))

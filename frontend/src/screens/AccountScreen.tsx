@@ -1,4 +1,4 @@
-﻿import React, { useMemo } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   ScrollView,
@@ -12,8 +12,9 @@ import { AppScreen } from '../components/common/AppScreen';
 import { ScreenHeader } from '../components/common/ScreenHeader';
 import { SectionTitle } from '../components/common/SectionTitle';
 import { useMarketplace } from '../contexts/MarketplaceContext';
+import { ativarLembretesVideomap, desativarLembretesVideomap, lembretesVideomapAtivos } from '../services/pushNotifications';
 import { colors, shadows } from '../theme/tokens';
-import { formatLeadDate } from '../utils/format';
+import { formatDateTime, formatExperienceLevelLabel, formatLeadDate, formatLeadStatusLabel } from '../utils/format';
 
 function profileCompletion(currentProvider: any) {
   if (!currentProvider) return 0;
@@ -31,15 +32,40 @@ function profileCompletion(currentProvider: any) {
 }
 
 export default function AccountScreen({ navigation }: any) {
-  const { signedIn, currentProvider, currentProviderLeads, favoriteProviderIds, signOut } = useMarketplace();
+  const { signedIn, currentProvider, currentProviderLeads, favoriteProviderIds, signOut, suggestions } = useMarketplace();
+  const [remindersEnabled, setRemindersEnabled] = useState(false);
+  const [reminderFeedback, setReminderFeedback] = useState('');
+
+  useEffect(() => {
+    lembretesVideomapAtivos().then(setRemindersEnabled).catch(() => undefined);
+  }, []);
 
   const completion = useMemo(() => profileCompletion(currentProvider), [currentProvider]);
   const recentLeads = currentProviderLeads.slice(0, 3);
 
+  async function handleReminderToggle() {
+    if (!currentProvider) return;
+
+    if (remindersEnabled) {
+      await desativarLembretesVideomap();
+      setRemindersEnabled(false);
+      setReminderFeedback('Lembretes do VideoMap desativados.');
+      return;
+    }
+
+    const activated = await ativarLembretesVideomap(currentProvider.name);
+    setRemindersEnabled(activated);
+    setReminderFeedback(
+      activated
+        ? 'Lembretes do VideoMap ativados para manter seu perfil em movimento.'
+        : 'Nao foi possivel ativar os lembretes agora.',
+    );
+  }
+
   if (!signedIn || !currentProvider) {
     return (
       <AppScreen scroll>
-        <ScreenHeader title="Studio" subtitle="seu perfil profissional com clima de social profile" />
+        <ScreenHeader title="Area Pro" subtitle="seu perfil profissional no VideoMap" />
 
         <View style={styles.guestProfileShell}>
           <View style={styles.guestTopRow}>
@@ -48,8 +74,8 @@ export default function AccountScreen({ navigation }: any) {
             </View>
             <View style={styles.guestStatsRow}>
               {[
-                { label: 'perfil', value: 'pro' },
-                { label: 'leads', value: 'novos' },
+                { label: 'perfil', value: 'ativo' },
+                { label: 'propostas', value: 'novas' },
                 { label: 'favoritos', value: String(favoriteProviderIds.length) },
               ].map((item) => (
                 <View key={item.label} style={styles.guestStatItem}>
@@ -60,9 +86,9 @@ export default function AccountScreen({ navigation }: any) {
             </View>
           </View>
 
-          <Text style={styles.guestName}>Seu Studio no VideoMap</Text>
-          <Text style={styles.guestHeadline}>Entre para publicar portfolio, receber briefs e apresentar seu trabalho com cara de perfil forte.</Text>
-          <Text style={styles.guestBio}>Clientes navegam sem atrito. Voce aparece com avatar, stats, grid de projetos e CTA direto para orcamento.</Text>
+          <Text style={styles.guestName}>Sua area profissional no VideoMap</Text>
+          <Text style={styles.guestHeadline}>Entre para publicar trabalhos, receber propostas e apresentar seu trabalho com mais presenca.</Text>
+          <Text style={styles.guestBio}>Clientes navegam sem atrito. Voce aparece com avatar, numeros, videos e contato direto para orcamento.</Text>
 
           <View style={styles.guestButtonRow}>
             <TouchableOpacity style={styles.guestPrimaryButton} onPress={() => navigation.navigate('Login')}>
@@ -75,15 +101,15 @@ export default function AccountScreen({ navigation }: any) {
         </View>
 
         <SectionTitle
-          eyebrow="Studio"
+          eyebrow="Area Pro"
           title="O que voce libera aqui"
-          description="Mesmo clima de perfil social, mas com foco em conversao e gestao de trabalho."
+          description="Menos atrito para vender, responder e evoluir seu perfil no app."
         />
 
         {[
-          'Avatar, bio, especialidades e portfolio em formato de grid.',
-          'Briefings organizados por etapa para responder mais rapido.',
-          'Analytics e Studio Pro para dar mais peso comercial ao perfil.',
+          'Avatar, bio, especialidades e trabalhos em formato de vitrine.',
+          'Propostas organizadas por etapa para responder com mais rapidez.',
+          'Metricas, lembretes e canal direto para sugerir melhorias no VideoMap.',
         ].map((item) => (
           <View key={item} style={styles.featureCard}>
             <Ionicons name="checkmark-circle" size={18} color={colors.accentStrong} />
@@ -97,24 +123,24 @@ export default function AccountScreen({ navigation }: any) {
   const profileHandle = currentProvider.contact.instagram || `@${currentProvider.name.toLowerCase().replace(/\s+/g, '')}`;
 
   const statItems = [
-    { label: 'posts', value: String(currentProvider.projects.length) },
-    { label: 'leads', value: String(currentProviderLeads.length) },
-    { label: 'perfil', value: `${completion}%` },
+    { label: 'projetos', value: String(currentProvider.projects.length) },
+    { label: 'propostas', value: String(currentProviderLeads.length) },
+    { label: 'perfil %', value: `${completion}%` },
   ];
 
   const highlightItems = [
     {
-      label: 'views perfil',
+      label: 'visitas perfil',
       value: String(currentProvider.metrics.profileViews),
       icon: 'eye-outline' as const,
     },
     {
-      label: 'views portfolio',
+      label: 'visitas trabalhos',
       value: String(currentProvider.metrics.portfolioViews),
       icon: 'images-outline' as const,
     },
     {
-      label: 'novos leads',
+      label: 'propostas novas',
       value: String(currentProviderLeads.filter((lead) => lead.status === 'new').length),
       icon: 'mail-unread-outline' as const,
     },
@@ -124,7 +150,7 @@ export default function AccountScreen({ navigation }: any) {
     <AppScreen scroll>
       <ScreenHeader
         title={profileHandle}
-        subtitle="aba Studio do videomaker"
+        subtitle="area do videomaker"
         rightAction={
           <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
             <Ionicons name="log-out-outline" size={18} color={colors.text} />
@@ -156,7 +182,7 @@ export default function AccountScreen({ navigation }: any) {
           </View>
           <View style={styles.metaBadge}>
             <Ionicons name="ribbon-outline" size={14} color={colors.accentStrong} />
-            <Text style={styles.metaBadgeText}>{currentProvider.experienceLevel}</Text>
+            <Text style={styles.metaBadgeText}>{formatExperienceLevelLabel(currentProvider.experienceLevel)}</Text>
           </View>
           <View style={styles.metaBadge}>
             <Ionicons name="sparkles-outline" size={14} color={colors.accentStrong} />
@@ -172,18 +198,22 @@ export default function AccountScreen({ navigation }: any) {
             <Text style={styles.secondaryButtonWideText}>Novo projeto</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryButtonWide} onPress={() => navigation.navigate('LeadsManagement')}>
-            <Text style={styles.secondaryButtonWideText}>Leads</Text>
+            <Text style={styles.secondaryButtonWideText}>Propostas</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.actionPillsRow}>
           <TouchableOpacity style={styles.actionPill} onPress={() => navigation.navigate('AnalyticsDashboard')}>
             <Ionicons name="stats-chart-outline" size={15} color={colors.accentStrong} />
-            <Text style={styles.actionPillText}>Analytics</Text>
+            <Text style={styles.actionPillText}>Metricas</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionPill} onPress={() => navigation.navigate('PremiumUpgrade')}>
             <Ionicons name="flash-outline" size={15} color={colors.accentStrong} />
-            <Text style={styles.actionPillText}>{currentProvider.isPro ? 'Studio Pro ativo' : 'Ativar Studio Pro'}</Text>
+            <Text style={styles.actionPillText}>{currentProvider.isPro ? 'Plano Pro ativo' : 'Ativar Plano Pro'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionPill} onPress={() => navigation.navigate('Suggestions')}>
+            <Ionicons name="chatbox-ellipses-outline" size={15} color={colors.accentStrong} />
+            <Text style={styles.actionPillText}>Sugestoes</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -200,16 +230,32 @@ export default function AccountScreen({ navigation }: any) {
         </View>
       </ScrollView>
 
+      <View style={styles.reminderCard}>
+        <View style={styles.reminderHeader}>
+          <View style={styles.reminderIconWrap}>
+            <Text style={styles.reminderEmoji}>📣</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.reminderTitle}>Lembretes do VideoMap</Text>
+            <Text style={styles.reminderText}>Ative mensagens para nao deixar seu perfil parado e lembrar de responder propostas.</Text>
+          </View>
+        </View>
+        {reminderFeedback ? <Text style={styles.reminderFeedback}>{reminderFeedback}</Text> : null}
+        <TouchableOpacity style={styles.reminderButton} onPress={handleReminderToggle}>
+          <Text style={styles.reminderButtonText}>{remindersEnabled ? 'Desativar lembretes' : 'Ativar lembretes'}</Text>
+        </TouchableOpacity>
+      </View>
+
       <SectionTitle
-        eyebrow="Briefings"
-        title="Leads recentes"
+        eyebrow="Propostas"
+        title="Propostas recentes"
         description="Os contatos mais frescos para voce manter o timing comercial."
       />
 
       {recentLeads.length === 0 ? (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>Ainda sem briefs novos por aqui.</Text>
-          <Text style={styles.emptyText}>Quando clientes enviarem pedidos, eles vao aparecer aqui em formato de inbox rapido.</Text>
+          <Text style={styles.emptyTitle}>Ainda sem propostas novas por aqui.</Text>
+          <Text style={styles.emptyText}>Quando clientes enviarem pedidos, eles vao aparecer aqui em formato de caixa de entrada rapida.</Text>
         </View>
       ) : (
         recentLeads.map((lead) => (
@@ -220,7 +266,7 @@ export default function AccountScreen({ navigation }: any) {
                 <Text style={styles.leadMeta}>{formatLeadDate(lead.createdAt)}</Text>
               </View>
               <View style={styles.leadBadge}>
-                <Text style={styles.leadBadgeText}>{lead.status}</Text>
+                <Text style={styles.leadBadgeText}>{formatLeadStatusLabel(lead.status)}</Text>
               </View>
             </View>
             <Text style={styles.leadBrief} numberOfLines={3}>{lead.brief}</Text>
@@ -230,23 +276,40 @@ export default function AccountScreen({ navigation }: any) {
       )}
 
       <SectionTitle
-        eyebrow="Portfolio"
-        title="Grid do Studio"
-        description="Mesmo clima de perfil social, mas com foco em publicar cases que ajudam a vender."
+        eyebrow="Sugestoes"
+        title="Melhorias enviadas"
+        description="Ideias mandadas por voce para evoluir o app."
+      />
+
+      {suggestions.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>Nenhuma sugestao enviada ainda.</Text>
+          <Text style={styles.emptyText}>Quando voce mandar melhorias pelo app, elas aparecem aqui para acompanhamento.</Text>
+        </View>
+      ) : (
+        suggestions.slice(0, 2).map((item) => (
+          <View key={item.id} style={styles.suggestionCard}>
+            <Text style={styles.suggestionTitle}>{item.title}</Text>
+            <Text style={styles.suggestionMeta}>{item.category} · {formatDateTime(item.createdAt)}</Text>
+            <Text style={styles.suggestionText}>{item.message}</Text>
+          </View>
+        ))
+      )}
+
+      <SectionTitle
+        eyebrow="Trabalhos"
+        title="Projetos publicados"
+        description="Cases que ajudam a vender o seu estilo para novos clientes."
       />
 
       <View style={styles.gridHeader}>
-        <View style={styles.gridTabActive}>
-          <Ionicons name="grid-outline" size={16} color={colors.accentStrong} />
-          <Text style={styles.gridTabActiveText}>posts</Text>
-        </View>
         <Text style={styles.gridHint}>{currentProvider.projects.length} projetos publicados</Text>
       </View>
 
       {currentProvider.projects.length === 0 ? (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>Seu portfolio ainda esta vazio.</Text>
-          <Text style={styles.emptyText}>Publique o primeiro projeto para transformar a aba Studio numa vitrine real.</Text>
+          <Text style={styles.emptyTitle}>Seus trabalhos ainda nao apareceram por aqui.</Text>
+          <Text style={styles.emptyText}>Publique o primeiro projeto para transformar sua area profissional numa vitrine real.</Text>
         </View>
       ) : (
         <View style={styles.projectGrid}>
@@ -518,9 +581,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginTop: 14,
+    flexWrap: 'wrap',
   },
   actionPill: {
-    flex: 1,
+    minWidth: '31%',
+    flexGrow: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -574,6 +639,55 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
   },
+  reminderCard: {
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 18,
+    marginBottom: 20,
+  },
+  reminderHeader: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  reminderIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accentSoft,
+  },
+  reminderEmoji: {
+    fontSize: 22,
+  },
+  reminderTitle: {
+    color: colors.text,
+    fontWeight: '800',
+    fontSize: 18,
+  },
+  reminderText: {
+    marginTop: 4,
+    color: colors.textMuted,
+    lineHeight: 20,
+  },
+  reminderFeedback: {
+    marginTop: 12,
+    color: colors.accentStrong,
+    fontWeight: '700',
+  },
+  reminderButton: {
+    marginTop: 14,
+    borderRadius: 16,
+    backgroundColor: colors.accentStrong,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  reminderButtonText: {
+    color: colors.white,
+    fontWeight: '800',
+  },
   leadCard: {
     borderRadius: 24,
     backgroundColor: colors.surface,
@@ -622,29 +736,35 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '700',
   },
+  suggestionCard: {
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    marginBottom: 12,
+  },
+  suggestionTitle: {
+    color: colors.text,
+    fontWeight: '800',
+    fontSize: 17,
+  },
+  suggestionMeta: {
+    marginTop: 6,
+    color: colors.textSoft,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  suggestionText: {
+    marginTop: 8,
+    color: colors.textMuted,
+    lineHeight: 20,
+  },
   gridHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 14,
-  },
-  gridTabActive: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 999,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  gridTabActiveText: {
-    color: colors.text,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    fontSize: 12,
-    letterSpacing: 0.6,
   },
   gridHint: {
     color: colors.textSoft,

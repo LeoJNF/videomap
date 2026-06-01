@@ -15,7 +15,7 @@ import { useMarketplace } from '../contexts/MarketplaceContext';
 import { colors, shadows } from '../theme/tokens';
 import { experienceLevels } from '../types/marketplace';
 import { pickImageFromDevice } from '../utils/deviceMedia';
-import { parseList } from '../utils/format';
+import { formatExperienceLevelLabel, parseList } from '../utils/format';
 
 export default function EditProfileScreen({ navigation }: any) {
   const { currentProvider, updateCurrentProvider } = useMarketplace();
@@ -113,7 +113,7 @@ export default function EditProfileScreen({ navigation }: any) {
           {experienceLevels.map((item) => (
             <FilterChip
               key={item}
-              label={item}
+              label={formatExperienceLevelLabel(item)}
               active={form.experienceLevel === item}
               onPress={() => setForm((current) => ({ ...current, experienceLevel: item }))}
             />
@@ -122,16 +122,16 @@ export default function EditProfileScreen({ navigation }: any) {
 
         {[
           ['Nome', 'name'],
-          ['Headline', 'headline'],
+          ['Descricao curta', 'headline'],
           ['Cidade base', 'location'],
           ['WhatsApp', 'whatsapp'],
           ['Instagram', 'instagram'],
-          ['Website', 'website'],
+          ['Site', 'website'],
           ['Email publico', 'email'],
-          ['Preco inicial', 'startingPrice'],
+          ['Valor inicial', 'startingPrice'],
           ['Tempo de resposta', 'responseTime'],
           ['Disponibilidade', 'availabilityLabel'],
-          ['Frase destaque', 'featuredQuote'],
+          ['Frase de destaque', 'featuredQuote'],
           ['Especialidades (separe por virgula)', 'specialties'],
         ].map(([label, key]) => (
           <View key={key}>

@@ -1,9 +1,10 @@
-﻿import React, { useEffect } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Linking,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -15,13 +16,18 @@ import { ScreenHeader } from '../components/common/ScreenHeader';
 import { SectionTitle } from '../components/common/SectionTitle';
 import { useMarketplace } from '../contexts/MarketplaceContext';
 import { colors, shadows } from '../theme/tokens';
+import { formatDateTime } from '../utils/format';
 
 export default function DetailsScreen({ route, navigation }: any) {
   const { providerId, projectId } = route.params;
-  const { getProviderById, getProjectById, trackProjectView } = useMarketplace();
+  const { getProviderById, getProjectById, getProjectComments, submitProjectComment, trackProjectView } = useMarketplace();
 
   const provider = getProviderById(providerId);
   const project = getProjectById(providerId, projectId);
+  const comments = useMemo(() => getProjectComments(projectId), [getProjectComments, projectId]);
+  const [authorName, setAuthorName] = useState('');
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     trackProjectView(providerId, projectId);
@@ -33,18 +39,28 @@ export default function DetailsScreen({ route, navigation }: any) {
         <ScreenHeader title="Projeto" onBack={() => navigation.goBack()} />
         <EmptyState
           title="Projeto nao encontrado"
-          description="Esse item do portfolio pode ter sido removido ou atualizado."
+          description="Esse trabalho pode ter sido removido ou atualizado."
         />
       </AppScreen>
     );
   }
 
   const openWhatsApp = () => {
-    const message = encodeURIComponent(
+    const messageText = encodeURIComponent(
       `Oi, ${provider.name}! Vi o projeto "${project.title}" no VideoMap e gostaria de solicitar algo nesse estilo.`,
     );
-    Linking.openURL(`https://wa.me/${provider.contact.whatsapp}?text=${message}`);
+    Linking.openURL(`https://wa.me/${provider.contact.whatsapp}?text=${messageText}`);
   };
+
+  async function handleCommentSubmit() {
+    if (!authorName.trim() || !message.trim()) return;
+
+    setSending(true);
+    await submitProjectComment(project.id, authorName, message);
+    setAuthorName('');
+    setMessage('');
+    setSending(false);
+  }
 
   return (
     <AppScreen scroll>
@@ -119,6 +135,62 @@ export default function DetailsScreen({ route, navigation }: any) {
           </View>
         ))}
       </View>
+
+      <SectionTitle
+        eyebrow="Comentarios"
+        title="Comentarios no video"
+        description="Espaco para registrar percepcoes sobre o projeto e a qualidade do trabalho."
+      />
+
+      <View style={styles.commentFormCard}>
+        <Text style={styles.commentLabel}>Seu nome</Text>
+        <TextInput
+          style={styles.input}
+          value={authorName}
+          onChangeText={setAuthorName}
+          placeholder="Como voce quer aparecer"
+          placeholderTextColor={colors.textSoft}
+        />
+
+        <Text style={styles.commentLabel}>Comentario</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          value={message}
+          onChangeText={setMessage}
+          placeholder="Escreva o que chamou sua atencao nesse video."
+          placeholderTextColor={colors.textSoft}
+          multiline
+          numberOfLines={5}
+          textAlignVertical="top"
+        />
+
+        <TouchableOpacity
+          style={[styles.primaryCommentButton, (!authorName.trim() || !message.trim() || sending) && styles.primaryCommentButtonDisabled]}
+          onPress={handleCommentSubmit}
+          disabled={!authorName.trim() || !message.trim() || sending}
+        >
+          <Text style={styles.primaryCommentButtonText}>{sending ? 'Enviando...' : 'Publicar comentario'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {comments.length === 0 ? (
+        <EmptyState
+          title="Ainda nao ha comentarios neste video"
+          description="Se voce gostou do estilo, pode ser a primeira pessoa a comentar aqui."
+        />
+      ) : (
+        <View style={styles.commentListWrap}>
+          {comments.map((comment) => (
+            <View key={comment.id} style={styles.commentCard}>
+              <View style={styles.commentTop}>
+                <Text style={styles.commentAuthor}>{comment.authorName}</Text>
+                <Text style={styles.commentDate}>{formatDateTime(comment.createdAt)}</Text>
+              </View>
+              <Text style={styles.commentMessage}>{comment.message}</Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       <View style={styles.providerCard}>
         <View style={styles.providerTop}>
@@ -255,6 +327,78 @@ const styles = StyleSheet.create({
   tagText: {
     color: colors.textMuted,
     fontWeight: '700',
+  },
+  commentFormCard: {
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 18,
+  },
+  commentLabel: {
+    color: colors.text,
+    fontWeight: '800',
+    marginBottom: 8,
+    marginTop: 12,
+    fontSize: 13,
+  },
+  input: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    color: colors.text,
+  },
+  textArea: {
+    minHeight: 120,
+  },
+  primaryCommentButton: {
+    marginTop: 18,
+    borderRadius: 18,
+    backgroundColor: colors.accentStrong,
+    paddingVertical: 15,
+    alignItems: 'center',
+  },
+  primaryCommentButtonDisabled: {
+    opacity: 0.45,
+  },
+  primaryCommentButtonText: {
+    color: colors.white,
+    fontWeight: '800',
+  },
+  commentListWrap: {
+    marginTop: 18,
+    gap: 12,
+    marginBottom: 24,
+  },
+  commentCard: {
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+  },
+  commentTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  commentAuthor: {
+    color: colors.text,
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  commentDate: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  commentMessage: {
+    marginTop: 10,
+    color: colors.textMuted,
+    lineHeight: 20,
   },
   providerCard: {
     marginBottom: 24,

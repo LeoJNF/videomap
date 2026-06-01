@@ -8,14 +8,14 @@ import { SectionTitle } from '../components/common/SectionTitle';
 import { useMarketplace } from '../contexts/MarketplaceContext';
 import { LeadStatus } from '../types/marketplace';
 import { colors } from '../theme/tokens';
-import { formatLeadDate } from '../utils/format';
+import { formatLeadDate, formatLeadStatusLabel } from '../utils/format';
 
 const filters: Array<{ label: string; value: 'all' | LeadStatus }> = [
-  { label: 'Todos', value: 'all' },
-  { label: 'Novos', value: 'new' },
-  { label: 'Contactados', value: 'contacted' },
+  { label: 'Todas', value: 'all' },
+  { label: 'Novas', value: 'new' },
+  { label: 'Em contato', value: 'contacted' },
   { label: 'Proposta', value: 'proposal' },
-  { label: 'Fechados', value: 'closed' },
+  { label: 'Fechadas', value: 'closed' },
 ];
 
 export default function LeadsManagementScreen({ navigation }: any) {
@@ -29,9 +29,9 @@ export default function LeadsManagementScreen({ navigation }: any) {
 
   return (
     <AppScreen scroll>
-      <ScreenHeader title="Leads" subtitle="Organize os briefings que entraram pelo app." onBack={() => navigation.goBack()} />
+      <ScreenHeader title="Propostas" subtitle="Organize os pedidos que entraram pelo app." onBack={() => navigation.goBack()} />
       <SectionTitle
-        eyebrow="Pipeline"
+        eyebrow="Fluxo"
         title="Filtre por etapa"
         description="Mantenha o acompanhamento comercial enxuto e visivel."
       />
@@ -49,8 +49,8 @@ export default function LeadsManagementScreen({ navigation }: any) {
 
       {leads.length === 0 ? (
         <EmptyState
-          title="Sem leads nesta etapa"
-          description="Assim que clientes enviarem solicitacoes, elas aparecerao aqui com nome, contato e briefing."
+          title="Sem propostas nesta etapa"
+          description="Assim que clientes enviarem solicitacoes, elas aparecerao aqui com nome, contato e detalhes do pedido."
         />
       ) : (
         leads.map((lead) => (
@@ -60,7 +60,7 @@ export default function LeadsManagementScreen({ navigation }: any) {
                 <Text style={styles.name}>{lead.clientName}</Text>
                 <Text style={styles.meta}>{formatLeadDate(lead.createdAt)} · {lead.location || 'local a definir'}</Text>
               </View>
-              <Text style={styles.status}>{lead.status}</Text>
+              <Text style={styles.status}>{formatLeadStatusLabel(lead.status)}</Text>
             </View>
 
             <Text style={styles.brief}>{lead.brief}</Text>
@@ -78,7 +78,7 @@ export default function LeadsManagementScreen({ navigation }: any) {
                   style={[styles.actionButton, lead.status === status && styles.actionButtonActive]}
                   onPress={() => updateLeadStatus(lead.id, status)}
                 >
-                  <Text style={[styles.actionButtonText, lead.status === status && styles.actionButtonTextActive]}>{status}</Text>
+                  <Text style={[styles.actionButtonText, lead.status === status && styles.actionButtonTextActive]}>{formatLeadStatusLabel(status)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -163,4 +163,3 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
 });
-

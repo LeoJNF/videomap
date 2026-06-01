@@ -15,12 +15,14 @@ import {
   SESSION_STORAGE_KEY,
 } from '../lib/storage';
 import {
+  ImprovementSuggestion,
   LeadPayload,
   LeadRequest,
   LeadStatus,
   MarketplaceState,
   NewProjectPayload,
   PortfolioProject,
+  ProjectComment,
   ProviderProfile,
   RegisterPayload,
 } from '../types/marketplace';
@@ -35,6 +37,7 @@ interface MarketplaceContextValue {
   favoriteProviders: ProviderProfile[];
   leads: LeadRequest[];
   currentProviderLeads: LeadRequest[];
+  suggestions: ImprovementSuggestion[];
   categories: string[];
   locations: string[];
   signIn: (email: string, password: string) => Promise<void>;
@@ -45,6 +48,13 @@ interface MarketplaceContextValue {
   addProject: (payload: NewProjectPayload) => Promise<void>;
   submitLeadRequest: (payload: LeadPayload) => Promise<LeadRequest>;
   updateLeadStatus: (leadId: string, status: LeadStatus) => Promise<void>;
+  getProjectComments: (projectId: string) => ProjectComment[];
+  submitProjectComment: (projectId: string, authorName: string, message: string) => Promise<void>;
+  submitImprovementSuggestion: (
+    title: string,
+    message: string,
+    category: ImprovementSuggestion['category'],
+  ) => Promise<void>;
   toggleFavorite: (providerId: string) => Promise<void>;
   isFavorite: (providerId: string) => boolean;
   getProviderById: (providerId: string) => ProviderProfile | undefined;
@@ -135,6 +145,14 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
       .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   }, [currentProvider, marketplace.leads]);
 
+  const currentProviderSuggestions = useMemo(() => {
+    if (!currentProvider) return [];
+
+    return marketplace.suggestions
+      .filter((suggestion) => suggestion.providerId === currentProvider.id)
+      .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+  }, [currentProvider, marketplace.suggestions]);
+
   const categories = useMemo(
     () =>
       Array.from(
@@ -190,7 +208,7 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
         id: slugId('provider'),
         name: payload.name.trim(),
         headline: 'Videomaker disponivel para novos projetos e colabs.',
-        bio: 'Perfil criado agora. Atualize sua descricao, portfolio e contatos para comecar a receber solicitacoes.',
+        bio: 'Perfil criado agora. Atualize sua descricao, trabalhos e contatos para comecar a receber solicitacoes.',
         avatarUrl:
           'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=500&q=80',
         coverImage:
@@ -205,7 +223,7 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
         startingPrice: 1800,
         responseTime: 'Responde no mesmo dia',
         availabilityLabel: 'Disponivel para novos projetos',
-        featuredQuote: 'Cada portfolio comeca com um bom primeiro projeto.',
+        featuredQuote: 'Toda vitrine comeca com um bom primeiro projeto.',
         accentColor: '#42685b',
         yearsExperience: 1,
         completedProjects: 0,
@@ -263,14 +281,14 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
 
     await updateCurrentProvider({
       isPro: true,
-      featuredQuote: 'Agora com destaque no catalogo e ferramentas extras de studio.',
+      featuredQuote: 'Agora com destaque no catalogo e ferramentas extras na area profissional.',
     });
   }, [currentProvider, updateCurrentProvider]);
 
   const addProject = useCallback(
     async (payload: NewProjectPayload) => {
       if (!currentProvider) {
-        throw new Error('Faca login como videomaker para publicar um portfolio.');
+        throw new Error('Faca login como videomaker para publicar um projeto.');
       }
 
       const project: PortfolioProject = {
@@ -335,6 +353,56 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
       leads: current.leads.map((lead) => (lead.id === leadId ? { ...lead, status } : lead)),
     }));
   }, []);
+
+  const getProjectComments = useCallback(
+    (projectId: string) =>
+      marketplace.comments
+        .filter((comment) => comment.projectId === projectId)
+        .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)),
+    [marketplace.comments],
+  );
+
+  const submitProjectComment = useCallback(async (projectId: string, authorName: string, message: string) => {
+    const comment: ProjectComment = {
+      id: slugId('comment'),
+      projectId,
+      authorName: authorName.trim(),
+      message: message.trim(),
+      createdAt: new Date().toISOString(),
+    };
+
+    setMarketplace((current) => ({
+      ...current,
+      comments: [comment, ...current.comments],
+    }));
+  }, []);
+
+  const submitImprovementSuggestion = useCallback(
+    async (
+      title: string,
+      message: string,
+      category: ImprovementSuggestion['category'],
+    ) => {
+      if (!currentProvider) {
+        throw new Error('Entre na area do videomaker para enviar uma sugestao.');
+      }
+
+      const suggestion: ImprovementSuggestion = {
+        id: slugId('suggestion'),
+        providerId: currentProvider.id,
+        title: title.trim(),
+        message: message.trim(),
+        category,
+        createdAt: new Date().toISOString(),
+      };
+
+      setMarketplace((current) => ({
+        ...current,
+        suggestions: [suggestion, ...current.suggestions],
+      }));
+    },
+    [currentProvider],
+  );
 
   const toggleFavorite = useCallback(async (providerId: string) => {
     setMarketplace((current) => {
@@ -414,6 +482,7 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
       favoriteProviders,
       leads: marketplace.leads,
       currentProviderLeads,
+      suggestions: currentProviderSuggestions,
       categories,
       locations,
       signIn,
@@ -424,6 +493,9 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
       addProject,
       submitLeadRequest,
       updateLeadStatus,
+      getProjectComments,
+      submitProjectComment,
+      submitImprovementSuggestion,
       toggleFavorite,
       isFavorite,
       getProviderById,
@@ -436,7 +508,9 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
       categories,
       currentProvider,
       currentProviderLeads,
+      currentProviderSuggestions,
       favoriteProviders,
+      getProjectComments,
       getProjectById,
       getProviderById,
       isFavorite,
@@ -449,6 +523,8 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
       signIn,
       signOut,
       submitLeadRequest,
+      submitImprovementSuggestion,
+      submitProjectComment,
       toggleFavorite,
       trackProfileView,
       trackProjectView,

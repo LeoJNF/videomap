@@ -107,7 +107,7 @@ export default function NewServiceScreen({ navigation }: any) {
           style={styles.input}
           value={form.title}
           onChangeText={(title) => setForm((current) => ({ ...current, title }))}
-          placeholder="Ex: Fashion film de colecao"
+          placeholder="Ex: Filme de moda de colecao"
           placeholderTextColor={colors.textSoft}
         />
 

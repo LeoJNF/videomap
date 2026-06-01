@@ -77,9 +77,9 @@ export default function LeadFormScreen({ route, navigation }: any) {
           <View style={styles.successBadge}>
             <Ionicons name="checkmark" size={28} color={colors.white} />
           </View>
-          <Text style={styles.successTitle}>Tudo certo. O briefing ja esta com {provider.name}.</Text>
+          <Text style={styles.successTitle}>Tudo certo. O pedido ja esta com {provider.name}.</Text>
           <Text style={styles.successText}>
-            A solicitacao entrou como lead novo e voce ainda pode continuar a conversa pelo WhatsApp se quiser acelerar o contato.
+            A solicitacao entrou como proposta nova e voce ainda pode continuar a conversa pelo WhatsApp se quiser acelerar o contato.
           </Text>
           <View style={styles.successMeta}>
             <Text style={styles.successMetaLabel}>enviado em</Text>
@@ -101,7 +101,7 @@ export default function LeadFormScreen({ route, navigation }: any) {
                 })
               }
             >
-              <Text style={styles.secondaryButtonText}>Rever portfolio</Text>
+              <Text style={styles.secondaryButtonText}>Rever trabalhos</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -117,7 +117,7 @@ export default function LeadFormScreen({ route, navigation }: any) {
       <AppScreen scroll>
         <ScreenHeader
           title="Solicitar projeto"
-          subtitle="Sem cadastro. So um briefing direto e objetivo."
+          subtitle="Sem cadastro. So um pedido direto e objetivo."
           onBack={() => navigation.goBack()}
         />
 

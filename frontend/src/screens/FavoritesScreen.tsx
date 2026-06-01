@@ -21,7 +21,7 @@ export default function FavoritesScreen({ navigation }: any) {
         <View style={styles.emptyWrap}>
           <EmptyState
             title="Sua curadoria ainda esta vazia"
-            description="Salve videomakers para comparar portfolio, cidade e nivel profissional com calma."
+            description="Salve videomakers para comparar trabalhos, cidade e nivel profissional com calma."
           />
           <TouchableOpacity
             style={styles.button}

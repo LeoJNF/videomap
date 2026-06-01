@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+﻿import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { AppScreen } from '../components/common/AppScreen';
 import { MetricCard } from '../components/common/MetricCard';
@@ -38,22 +38,22 @@ export default function AnalyticsDashboardScreen({ navigation }: any) {
 
   return (
     <AppScreen scroll>
-      <ScreenHeader title="Analytics" subtitle="Leituras simples sobre interesse, portfolio e leads." onBack={() => navigation.goBack()} />
+      <ScreenHeader title="Metricas" subtitle="Leituras simples sobre interesse, videos e propostas." onBack={() => navigation.goBack()} />
 
       <View style={styles.heroCard}>
         <Text style={styles.heroEyebrow}>Resumo da semana</Text>
-        <Text style={styles.heroTitle}>{currentProvider.metrics.profileViews} visitas no perfil e {currentProviderLeads.length} leads mapeados.</Text>
+        <Text style={styles.heroTitle}>{currentProvider.metrics.profileViews} visitas no perfil e {currentProviderLeads.length} propostas mapeadas.</Text>
         <Text style={styles.heroText}>Use isso para decidir quais projetos merecem mais destaque e em que etapa cada contato esta.</Text>
       </View>
 
       <View style={styles.metricsGrid}>
-        <MetricCard label="leads novos" value={String(data.newLeads)} accent="accent" />
-        <MetricCard label="leads em proposta" value={String(data.proposalLeads)} accent="sage" />
+        <MetricCard label="propostas novas" value={String(data.newLeads)} accent="accent" />
+        <MetricCard label="propostas em envio" value={String(data.proposalLeads)} accent="sage" />
         <MetricCard label="projetos publicados" value={String(currentProvider.projects.length)} accent="gold" />
       </View>
 
       <View style={styles.metricsGrid}>
-        <MetricCard label="media de views por projeto" value={String(data.averageViews)} accent="sage" />
+        <MetricCard label="media de visitas por projeto" value={String(data.averageViews)} accent="sage" />
         <MetricCard label="contatos fechados" value={String(data.closedLeads)} accent="accent" />
         <MetricCard label="favoritos no app" value={String(data.favorites)} accent="gold" />
       </View>
@@ -65,21 +65,21 @@ export default function AnalyticsDashboardScreen({ navigation }: any) {
       />
 
       <View style={styles.insightCard}>
-        <Text style={styles.insightTitle}>1. Portfolio com mais chance de gerar conversa</Text>
+        <Text style={styles.insightTitle}>1. Mostre primeiro o que mais converte</Text>
         <Text style={styles.insightText}>
-          Os projetos de capa costumam receber mais atencao. Se quiser melhorar a conversao, mantenha na frente os cases mais alinhados ao tipo de cliente que voce quer atrair.
+          Os projetos de capa costumam receber mais atencao. Se quiser melhorar a conversao, mantenha na frente os cases mais alinhados ao cliente que voce quer atrair.
         </Text>
       </View>
       <View style={styles.insightCard}>
-        <Text style={styles.insightTitle}>2. Leads sem resposta rapida esfriam</Text>
+        <Text style={styles.insightTitle}>2. Propostas sem resposta rapida esfriam</Text>
         <Text style={styles.insightText}>
-          Hoje voce tem {data.newLeads} leads novos e {data.contactedLeads} em contato. Vale responder os novos primeiro para nao perder timing.
+          Hoje voce tem {data.newLeads} propostas novas e {data.contactedLeads} em contato. Vale responder as novas primeiro para nao perder timing.
         </Text>
       </View>
       <View style={styles.insightCard}>
-        <Text style={styles.insightTitle}>3. Atualize o portfolio regularmente</Text>
+        <Text style={styles.insightTitle}>3. Atualize seus trabalhos com frequencia</Text>
         <Text style={styles.insightText}>
-          Perfis com portfolio ativo passam mais confianca. Sempre que finalizar um trabalho forte, publique um case novo ou substitua a capa principal.
+          Perfis com trabalhos atualizados passam mais confianca. Sempre que finalizar um projeto forte, publique um caso novo ou substitua a capa principal.
         </Text>
       </View>
     </AppScreen>
